@@ -6,9 +6,9 @@ This document turns the consolidated design into an execution plan. It is organi
 Use this document as the build order for the workflow. [`implementation_consolidated.md`](/home/petr/PycharmProjects/get_phylo/docs/implementation_consolidated.md) remains the architectural decision record; this file is the delivery plan.
 
 ## Current Status
-- Completed: Phases 0 through 6
-- Next target: Phase 7
-- Pending after that: Phases 8 and 9
+- Completed: Phases 0 through 7
+- Current target: Phase 8
+- Pending after that: Phase 9
 
 ## Phase 0: Repository Bootstrap (Completed)
 ### Scope
@@ -190,7 +190,7 @@ Export one protein FASTA per retained locus and align each locus independently.
 ### Exit Criteria
 Each retained locus has a deterministic aligned protein FASTA ready for tree inference.
 
-## Phase 7: Gene-Tree Inference with IQ-TREE 3 (Current)
+## Phase 7: Gene-Tree Inference with IQ-TREE 3 (Completed)
 ### Scope
 Infer one ML tree per locus and preserve branch lengths and support values needed by `wastral`.
 
@@ -230,6 +230,7 @@ Run the default species-tree backend and keep the topology-only comparison path 
 
 ### Tasks
 - define the `wastral` execution rule
+- normalize IQ-TREE aBayes support labels into the numeric internal-label format accepted by `wastral -B`
 - keep `astral4` as an optional comparison rule, not the default
 - standardize logging and provenance capture
 - verify that the aggregate gene-tree format is accepted by ASTER

@@ -123,6 +123,7 @@ class ManifestWorkflowTests(unittest.TestCase):
         subprocess.run(
             [
                 "snakemake",
+                "--nolock",
                 "--cores",
                 "1",
                 validated_target,

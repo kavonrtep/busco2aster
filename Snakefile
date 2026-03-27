@@ -1,9 +1,10 @@
 """
-Phase 7 Snakemake entrypoint.
+Phase 8 Snakemake entrypoint.
 
 This file currently exposes manifest validation, BUSCO tool preflight,
 per-sample BUSCO execution, BUSCO QC summarization, locus selection,
-batched retained-locus FASTA export, alignment, and per-locus gene trees.
+batched retained-locus FASTA export, alignment, per-locus gene trees,
+and ASTER species-tree inference.
 """
 
 import csv
@@ -12,6 +13,7 @@ from pathlib import Path
 from scripts.alignment import load_retained_locus_ids, locus_output_paths
 from scripts.busco import busco_output_paths
 from scripts.gene_trees import gene_tree_output_paths
+from scripts.species_tree import species_tree_output_paths
 
 configfile: "config/config.yaml"
 
@@ -43,7 +45,14 @@ ALIGNMENTS_COMPLETE = "results/loci/alignments.complete"
 GENE_TREE_DIR = "results/gene_trees/per_locus"
 GENE_TREE_MANIFEST = "results/gene_trees/gene_tree_manifest.tsv"
 GENE_TREE_AGGREGATE = "results/gene_trees/gene_trees.raw.tre"
+WASTRAL_GENE_TREE_INPUT = "results/gene_trees/gene_trees.wastral.tre"
 GENE_TREES_COMPLETE = "results/gene_trees/gene_trees.complete"
+SPECIES_TREE_DIR = "results/species_tree"
+SPECIES_TREE_BACKEND = str(config.get("species_tree_backend", "wastral"))
+DEFAULT_SPECIES_TREE_OUTPUTS = species_tree_output_paths(SPECIES_TREE_BACKEND)
+WASTRAL_OUTPUTS = species_tree_output_paths("wastral")
+ASTRAL4_OUTPUTS = species_tree_output_paths("astral4")
+SPECIES_TREE_COMPLETE = f"{SPECIES_TREE_DIR}/species_tree.complete"
 SAMPLE_RECORDS = load_sample_records(config["samples"])
 SAMPLES = [row["sample_id"] for row in SAMPLE_RECORDS]
 SAMPLE_TO_ASSEMBLY = {row["sample_id"]: row["assembly_fasta"] for row in SAMPLE_RECORDS}
@@ -75,6 +84,7 @@ include: "workflow/rules/busco_summary.smk"
 include: "workflow/rules/locus_matrix.smk"
 include: "workflow/rules/alignment.smk"
 include: "workflow/rules/gene_trees.smk"
+include: "workflow/rules/species_tree.smk"
 
 
 localrules: all
@@ -103,6 +113,18 @@ rule gene_trees_complete:
     output:
         touch(GENE_TREES_COMPLETE)
 
+
+rule species_tree_complete:
+    input:
+        [
+            GENE_TREES_COMPLETE,
+            DEFAULT_SPECIES_TREE_OUTPUTS["treefile"],
+            DEFAULT_SPECIES_TREE_OUTPUTS["log"],
+            DEFAULT_SPECIES_TREE_OUTPUTS["completion"],
+        ]
+    output:
+        touch(SPECIES_TREE_COMPLETE)
+
 rule all:
     input:
         [
@@ -121,4 +143,8 @@ rule all:
             GENE_TREE_MANIFEST,
             GENE_TREE_AGGREGATE,
             GENE_TREES_COMPLETE,
+            WASTRAL_GENE_TREE_INPUT,
+            DEFAULT_SPECIES_TREE_OUTPUTS["treefile"],
+            DEFAULT_SPECIES_TREE_OUTPUTS["log"],
+            SPECIES_TREE_COMPLETE,
         ]

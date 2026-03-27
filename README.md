@@ -3,10 +3,11 @@
 This repository will host a reproducible phylogenomics workflow built with
 Snakemake.
 
-Current status: Phase 6 retained-locus FASTA export and alignment. The repository now has a normalized
-sample sheet, a workflow config, BUSCO tool preflight, per-sample BUSCO
-execution, stable BUSCO QC tables, locus-level retention decisions, batched
-retained-protein FASTA export, and per-locus MAFFT alignments.
+Current status: Phase 8 species-tree inference is implemented. The repository now has a normalized
+sample sheet, BUSCO tool preflight and per-sample execution, stable BUSCO QC
+tables, locus-level retention decisions, batched retained-protein FASTA export,
+per-locus MAFFT alignments, IQ-TREE 3 gene-tree inference, and ASTER-based
+species-tree rules with `wastral` as the default backend.
 
 Useful commands:
 
@@ -20,6 +21,10 @@ snakemake --cores 4 results/qc/retained_loci.tsv
 snakemake --cores 4 results/loci/raw_fastas_manifest.tsv
 snakemake --cores 4 results/loci/alignments/35at4069.aln.faa
 snakemake --cores 4 results/loci/alignments.complete
+python3 -m scripts.install_iqtree3
+python3 -m scripts.install_aster
+snakemake --cores 4 results/gene_trees/gene_trees.complete
+snakemake --cores 4 results/species_tree/species_tree.complete
 python3 -m scripts.normalize_manifest --input test_data/genome_set2.csv --output /tmp/samples.tsv
 python3 -m unittest discover -s tests -v
 ```
