@@ -1,0 +1,62 @@
+rule capture_busco_metadata:
+    output:
+        versions=BUSCO_TOOL_VERSIONS,
+        datasets=BUSCO_DATASETS,
+    conda:
+        "../envs/busco.yaml"
+    params:
+        download_path=config["busco_download_path"],
+    shell:
+        r"""
+        mkdir -p "$(dirname {output.versions})"
+        printf "tool\tversion\n" > {output.versions}
+        printf "busco\t%s\n" "$(busco --version | tr -d '\r')" >> {output.versions}
+        busco --download_path {params.download_path:q} --list-datasets > {output.datasets}
+        """
+
+
+rule verify_busco_lineage:
+    input:
+        datasets=BUSCO_DATASETS,
+    output:
+        BUSCO_LINEAGE_VERIFIED,
+    params:
+        lineage=config["busco_lineage"],
+    shell:
+        (
+            "python3 -m scripts.verify_busco_lineage "
+            "--dataset-list {input.datasets} "
+            "--lineage {params.lineage} "
+            "--output {output}"
+        )
+
+
+rule run_busco:
+    input:
+        assembly=lambda wildcards: SAMPLE_TO_ASSEMBLY[wildcards.sample],
+        validated=VALIDATED_MANIFEST,
+        lineage=BUSCO_LINEAGE_VERIFIED,
+    output:
+        command="results/busco/{sample}/command.sh",
+        paths="results/busco/{sample}/paths.tsv",
+        short_summary="results/busco/{sample}/short_summary.txt",
+        full_table="results/busco/{sample}/full_table.tsv",
+        completion="results/busco/{sample}/run.complete",
+    params:
+        sample_dir="results/busco/{sample}",
+        raw_root="results/busco/{sample}/raw",
+        lineage=config["busco_lineage"],
+        download_path=config["busco_download_path"],
+    threads:
+        get_thread_count("busco")
+    conda:
+        "../envs/busco.yaml"
+    shell:
+        r"""
+        mkdir -p {params.sample_dir:q}
+        mkdir -p {params.raw_root:q}
+        printf '#!/usr/bin/env bash\nset -euo pipefail\n' > {output.command:q}
+        printf '%s\n' "busco --in {input.assembly:q} --mode genome --lineage_dataset {params.lineage:q} --cpu {threads} --out {wildcards.sample:q} --out_path {params.raw_root:q} --download_path {params.download_path:q}" >> {output.command:q}
+        bash {output.command:q}
+        python3 -m scripts.standardize_busco_run --sample-id {wildcards.sample:q} --sample-dir {params.sample_dir:q} --raw-root {params.raw_root:q}
+        """

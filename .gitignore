@@ -10,3 +10,4 @@ __pycache__/
 results/
 work/
 .venv/
+busco_downloads/
