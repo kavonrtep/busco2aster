@@ -11,5 +11,6 @@ gene_tree_tool: iqtree3
 species_tree_backend: wastral
 threads:
   default: 4
+  alignment: 4
   busco: 4
   iqtree: 4

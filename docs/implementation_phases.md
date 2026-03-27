@@ -6,9 +6,9 @@ This document turns the consolidated design into an execution plan. It is organi
 Use this document as the build order for the workflow. [`implementation_consolidated.md`](/home/petr/PycharmProjects/get_phylo/docs/implementation_consolidated.md) remains the architectural decision record; this file is the delivery plan.
 
 ## Current Status
-- Completed: Phases 0 through 5
-- Next target: Phase 6
-- Pending after that: Phases 7 through 9
+- Completed: Phases 0 through 6
+- Next target: Phase 7
+- Pending after that: Phases 8 and 9
 
 ## Phase 0: Repository Bootstrap (Completed)
 ### Scope
@@ -164,7 +164,7 @@ Build the core locus-by-taxon matrix and apply the strict v1 selection rules.
 ### Exit Criteria
 The workflow produces a transparent locus matrix and a retained-loci decision table that fully explain why each locus passed or failed.
 
-## Phase 6: Locus FASTA Export and Alignment (Current)
+## Phase 6: Locus FASTA Export and Alignment (Completed)
 ### Scope
 Export one protein FASTA per retained locus and align each locus independently.
 
@@ -190,7 +190,7 @@ Export one protein FASTA per retained locus and align each locus independently.
 ### Exit Criteria
 Each retained locus has a deterministic aligned protein FASTA ready for tree inference.
 
-## Phase 7: Gene-Tree Inference with IQ-TREE 3
+## Phase 7: Gene-Tree Inference with IQ-TREE 3 (Current)
 ### Scope
 Infer one ML tree per locus and preserve branch lengths and support values needed by `wastral`.
 

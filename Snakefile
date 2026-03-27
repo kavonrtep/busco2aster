@@ -1,13 +1,15 @@
 """
-Phase 3 Snakemake entrypoint.
+Phase 6 Snakemake entrypoint.
 
 This file currently exposes manifest validation, BUSCO tool preflight,
-per-sample BUSCO execution, BUSCO QC summarization, and locus selection.
+per-sample BUSCO execution, BUSCO QC summarization, locus selection,
+retained-locus FASTA export, and alignment.
 """
 
 import csv
 from pathlib import Path
 
+from scripts.alignment import load_retained_locus_ids, locus_output_paths
 from scripts.busco import busco_output_paths
 
 configfile: "config/config.yaml"
@@ -33,6 +35,8 @@ BUSCO_SUMMARY_TABLE = "results/qc/busco_summary.tsv"
 BUSCO_RECORDS_TABLE = "results/qc/busco_records.tsv"
 LOCUS_TAXON_MATRIX = "results/qc/locus_taxon_matrix.tsv"
 RETAINED_LOCI_TABLE = "results/qc/retained_loci.tsv"
+RAW_FASTA_DIR = "results/loci/raw_fastas"
+ALIGNMENT_DIR = "results/loci/alignments"
 SAMPLE_RECORDS = load_sample_records(config["samples"])
 SAMPLES = [row["sample_id"] for row in SAMPLE_RECORDS]
 SAMPLE_TO_ASSEMBLY = {row["sample_id"]: row["assembly_fasta"] for row in SAMPLE_RECORDS}
@@ -48,6 +52,20 @@ include: "workflow/rules/manifest.smk"
 include: "workflow/rules/busco.smk"
 include: "workflow/rules/busco_summary.smk"
 include: "workflow/rules/locus_matrix.smk"
+include: "workflow/rules/alignment.smk"
+
+
+def retained_locus_ids() -> list[str]:
+    retained_output = checkpoints.select_loci.get().output[0]
+    return load_retained_locus_ids(Path(retained_output))
+
+
+def retained_raw_fasta_targets(wildcards):
+    return [locus_output_paths(locus_id)["raw_fasta"] for locus_id in retained_locus_ids()]
+
+
+def retained_alignment_targets(wildcards):
+    return [locus_output_paths(locus_id)["alignment"] for locus_id in retained_locus_ids()]
 
 localrules: all
 
@@ -64,4 +82,6 @@ rule all:
             BUSCO_RECORDS_TABLE,
             LOCUS_TAXON_MATRIX,
             RETAINED_LOCI_TABLE,
+            retained_raw_fasta_targets,
+            retained_alignment_targets,
         ]

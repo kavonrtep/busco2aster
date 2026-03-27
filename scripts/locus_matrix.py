@@ -400,7 +400,10 @@ def build_retained_loci_rows(
         occupancy = complete_single_copy_taxa / total_taxa if total_taxa else 0.0
         passes_occupancy = occupancy >= occupancy_threshold
 
-        retained_rows_for_locus = [row for row in rows if _as_bool(str(row["include_in_occupancy"]))]
+        retained_rows_for_locus = sorted(
+            [row for row in rows if _as_bool(str(row["include_in_occupancy"]))],
+            key=lambda row: str(row["sanitized_taxon_id"]),
+        )
         retained_lengths = [
             int(str(row["representative_protein_length_aa"]))
             for row in retained_rows_for_locus

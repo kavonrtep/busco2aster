@@ -13,7 +13,7 @@ rule build_locus_matrix:
         )
 
 
-rule select_loci:
+checkpoint select_loci:
     input:
         matrix=LOCUS_TAXON_MATRIX,
     output:
