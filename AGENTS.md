@@ -12,7 +12,9 @@ Use Snakemake for orchestration and validate each stage with a dry-run before he
 snakemake -n
 snakemake --cores 4 results/qc/busco_summary.tsv
 snakemake --cores 4 results/qc/retained_loci.tsv
+snakemake --cores 4 results/loci/raw_fastas_manifest.tsv
 snakemake --cores 4 results/loci/alignments/35at4069.aln.faa
+snakemake --cores 4 results/loci/alignments.complete
 python3 -m unittest discover -s tests -v
 git status --short
 ```

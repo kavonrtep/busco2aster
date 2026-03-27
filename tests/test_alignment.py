@@ -4,7 +4,12 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from scripts.alignment import export_locus_fasta, load_retained_locus_ids, locus_output_paths
+from scripts.alignment import (
+    export_locus_fasta,
+    export_retained_fastas,
+    load_retained_locus_ids,
+    locus_output_paths,
+)
 from scripts.locus_matrix import parse_fasta_records
 from scripts.manifest import write_tsv
 
@@ -267,6 +272,35 @@ class AlignmentUnitTests(unittest.TestCase):
         self.assertEqual(records[1][0], "taxon_b")
         self.assertEqual(records[1][1], "MKT*AA*")
 
+    def test_export_retained_fastas_writes_manifest_and_cleans_stale_files(self):
+        tempdir, repo_root, matrix_path, retained_path, output_path = self.build_fixture()
+        self.addCleanup(tempdir.cleanup)
+
+        output_dir = output_path.parent
+        manifest_path = repo_root / "out" / "raw_fastas_manifest.tsv"
+        stale_path = output_dir / "stale.faa"
+        stale_path.parent.mkdir(parents=True, exist_ok=True)
+        stale_path.write_text(">stale\nM\n", encoding="utf-8")
+
+        export_retained_fastas(matrix_path, retained_path, output_dir, manifest_path, repo_root)
+
+        records = parse_fasta_records(output_dir / "locus_keep.faa")
+        self.assertEqual([header for header, _ in records], ["taxon_a", "taxon_b"])
+        self.assertFalse(stale_path.exists())
+
+        with manifest_path.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle, delimiter="\t"))
+        self.assertEqual(
+            rows,
+            [
+                {
+                    "locus_id": "locus_keep",
+                    "raw_fasta": (output_dir / "locus_keep.faa").as_posix(),
+                    "taxon_count": "2",
+                }
+            ],
+        )
+
     def test_locus_output_paths_are_deterministic(self):
         paths = locus_output_paths("35at4069")
         self.assertEqual(paths["raw_fasta"], "results/loci/raw_fastas/35at4069.faa")
@@ -308,7 +342,7 @@ class AlignmentWorkflowTests(unittest.TestCase):
                 "-n",
                 "-p",
                 "-R",
-                "export_locus_fasta",
+                "export_retained_fastas",
                 "align_locus",
                 "--cores",
                 "4",
@@ -319,13 +353,13 @@ class AlignmentWorkflowTests(unittest.TestCase):
             text=True,
             check=True,
         )
-        self.assertIn("rule export_locus_fasta:", result.stdout)
+        self.assertIn("rule export_retained_fastas:", result.stdout)
         self.assertIn("rule align_locus:", result.stdout)
-        self.assertIn("mafft --amino --anysymbol --auto --thread 4", result.stdout)
+        self.assertIn("mafft --amino --anysymbol --auto --thread 1", result.stdout)
 
     def test_exported_fasta_matches_retained_loci_output_for_real_locus(self):
         subprocess.run(
-            ["snakemake", "--cores", "1", "results/loci/raw_fastas/35at4069.faa"],
+            ["snakemake", "--cores", "1", "results/loci/raw_fastas_manifest.tsv"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -342,6 +376,16 @@ class AlignmentWorkflowTests(unittest.TestCase):
 
         self.assertEqual(headers, retained_map["35at4069"]["retained_sanitized_taxon_ids"].split(","))
         self.assertEqual(headers, sorted(headers))
+
+        with (REPO_ROOT / "results/loci/raw_fastas_manifest.tsv").open(
+            newline="", encoding="utf-8"
+        ) as handle:
+            manifest_rows = list(csv.DictReader(handle, delimiter="\t"))
+        manifest_map = {row["locus_id"]: row for row in manifest_rows}
+        self.assertEqual(
+            manifest_map["35at4069"]["raw_fasta"],
+            "results/loci/raw_fastas/35at4069.faa",
+        )
 
     def test_retained_locus_id_loader_matches_real_table(self):
         with (REPO_ROOT / "results/qc/retained_loci.tsv").open(newline="", encoding="utf-8") as handle:
