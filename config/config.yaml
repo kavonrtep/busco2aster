@@ -9,8 +9,13 @@ alignment_tool: mafft
 trimming_mode: none
 gene_tree_tool: iqtree3
 species_tree_backend: wastral
+iqtree_executable: work/tools/iqtree3/current/bin/iqtree3
+iqtree_model: MFP
+iqtree_support_mode: abayes
+iqtree_seed: 20260327
+iqtree_ufboot_replicates: 1000
 threads:
   default: 4
   alignment: 1
   busco: 4
-  iqtree: 4
+  iqtree: 1

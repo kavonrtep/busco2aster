@@ -1,9 +1,9 @@
 """
-Phase 6 Snakemake entrypoint.
+Phase 7 Snakemake entrypoint.
 
 This file currently exposes manifest validation, BUSCO tool preflight,
 per-sample BUSCO execution, BUSCO QC summarization, locus selection,
-batched retained-locus FASTA export, and alignment.
+batched retained-locus FASTA export, alignment, and per-locus gene trees.
 """
 
 import csv
@@ -11,6 +11,7 @@ from pathlib import Path
 
 from scripts.alignment import load_retained_locus_ids, locus_output_paths
 from scripts.busco import busco_output_paths
+from scripts.gene_trees import gene_tree_output_paths
 
 configfile: "config/config.yaml"
 
@@ -39,6 +40,10 @@ RAW_FASTA_DIR = "results/loci/raw_fastas"
 RAW_FASTA_MANIFEST = "results/loci/raw_fastas_manifest.tsv"
 ALIGNMENT_DIR = "results/loci/alignments"
 ALIGNMENTS_COMPLETE = "results/loci/alignments.complete"
+GENE_TREE_DIR = "results/gene_trees/per_locus"
+GENE_TREE_MANIFEST = "results/gene_trees/gene_tree_manifest.tsv"
+GENE_TREE_AGGREGATE = "results/gene_trees/gene_trees.raw.tre"
+GENE_TREES_COMPLETE = "results/gene_trees/gene_trees.complete"
 SAMPLE_RECORDS = load_sample_records(config["samples"])
 SAMPLES = [row["sample_id"] for row in SAMPLE_RECORDS]
 SAMPLE_TO_ASSEMBLY = {row["sample_id"]: row["assembly_fasta"] for row in SAMPLE_RECORDS}
@@ -50,19 +55,27 @@ BUSCO_SUMMARY_INPUTS = [
     for artifact in ("completion", "short_summary", "full_table", "paths")
 ]
 
-include: "workflow/rules/manifest.smk"
-include: "workflow/rules/busco.smk"
-include: "workflow/rules/busco_summary.smk"
-include: "workflow/rules/locus_matrix.smk"
-include: "workflow/rules/alignment.smk"
-
-
 def retained_locus_ids() -> list[str]:
     retained_output = checkpoints.select_loci.get().output[0]
     return load_retained_locus_ids(Path(retained_output))
 
 def retained_alignment_targets(wildcards):
     return [locus_output_paths(locus_id)["alignment"] for locus_id in retained_locus_ids()]
+
+def retained_gene_tree_reports(wildcards):
+    return [gene_tree_output_paths(locus_id)["report"] for locus_id in retained_locus_ids()]
+
+
+def retained_gene_tree_treefiles(wildcards):
+    return [gene_tree_output_paths(locus_id)["treefile"] for locus_id in retained_locus_ids()]
+
+include: "workflow/rules/manifest.smk"
+include: "workflow/rules/busco.smk"
+include: "workflow/rules/busco_summary.smk"
+include: "workflow/rules/locus_matrix.smk"
+include: "workflow/rules/alignment.smk"
+include: "workflow/rules/gene_trees.smk"
+
 
 localrules: all
 
@@ -79,6 +92,17 @@ rule alignments_complete:
     output:
         touch(ALIGNMENTS_COMPLETE)
 
+rule gene_trees_complete:
+    input:
+        [
+            ALIGNMENTS_COMPLETE,
+            GENE_TREE_MANIFEST,
+            GENE_TREE_AGGREGATE,
+            retained_gene_tree_treefiles,
+        ]
+    output:
+        touch(GENE_TREES_COMPLETE)
+
 rule all:
     input:
         [
@@ -94,4 +118,7 @@ rule all:
             RETAINED_LOCI_TABLE,
             RAW_FASTA_MANIFEST,
             retained_alignment_targets,
+            GENE_TREE_MANIFEST,
+            GENE_TREE_AGGREGATE,
+            GENE_TREES_COMPLETE,
         ]
