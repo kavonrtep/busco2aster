@@ -5,7 +5,12 @@ This document turns the consolidated design into an execution plan. It is organi
 
 Use this document as the build order for the workflow. [`implementation_consolidated.md`](/home/petr/PycharmProjects/get_phylo/docs/implementation_consolidated.md) remains the architectural decision record; this file is the delivery plan.
 
-## Phase 0: Repository Bootstrap
+## Current Status
+- Completed: Phases 0 through 5
+- Next target: Phase 6
+- Pending after that: Phases 7 through 9
+
+## Phase 0: Repository Bootstrap (Completed)
 ### Scope
 Create the repository skeleton needed to develop the workflow incrementally.
 
@@ -32,7 +37,7 @@ Create the repository skeleton needed to develop the workflow incrementally.
 ### Exit Criteria
 The repository can execute a dry-run without workflow logic errors and has a stable place for rules, environments, scripts, and tests.
 
-## Phase 1: Configuration and Manifest Normalization
+## Phase 1: Configuration and Manifest Normalization (Completed)
 ### Scope
 Introduce the normalized internal manifest and the run-wide configuration file.
 
@@ -60,7 +65,7 @@ Introduce the normalized internal manifest and the run-wide configuration file.
 ### Exit Criteria
 All primary inputs are normalized into a stable internal format and the workflow can validate them before any heavy computation starts.
 
-## Phase 2: BUSCO Environment and Lineage Verification
+## Phase 2: BUSCO Environment and Lineage Verification (Completed)
 ### Scope
 Prepare BUSCO execution and verify that the configured lineage exists before launching per-sample jobs.
 
@@ -84,7 +89,7 @@ Prepare BUSCO execution and verify that the configured lineage exists before lau
 ### Exit Criteria
 The workflow can prove that BUSCO is runnable and that the requested lineage identifier is valid before any BUSCO jobs are submitted.
 
-## Phase 3: BUSCO Per-Sample Execution
+## Phase 3: BUSCO Per-Sample Execution (Completed)
 ### Scope
 Run BUSCO genome mode once per sample and collect raw BUSCO outputs in a stable directory structure.
 
@@ -108,7 +113,7 @@ Run BUSCO genome mode once per sample and collect raw BUSCO outputs in a stable 
 ### Exit Criteria
 The workflow can launch BUSCO reproducibly for every validated sample and produce parseable outputs.
 
-## Phase 4: BUSCO Parsing and Summary Tables
+## Phase 4: BUSCO Parsing and Summary Tables (Completed)
 ### Scope
 Parse BUSCO outputs into stable tabular QC artifacts.
 
@@ -132,7 +137,7 @@ Parse BUSCO outputs into stable tabular QC artifacts.
 ### Exit Criteria
 BUSCO results are represented in stable machine-readable tables, independent of BUSCO’s internal file naming.
 
-## Phase 5: Locus Matrix Construction and Selection
+## Phase 5: Locus Matrix Construction and Selection (Completed)
 ### Scope
 Build the core locus-by-taxon matrix and apply the strict v1 selection rules.
 
@@ -159,7 +164,7 @@ Build the core locus-by-taxon matrix and apply the strict v1 selection rules.
 ### Exit Criteria
 The workflow produces a transparent locus matrix and a retained-loci decision table that fully explain why each locus passed or failed.
 
-## Phase 6: Locus FASTA Export and Alignment
+## Phase 6: Locus FASTA Export and Alignment (Current)
 ### Scope
 Export one protein FASTA per retained locus and align each locus independently.
 
