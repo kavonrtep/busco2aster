@@ -2,7 +2,7 @@
 Phase 3 Snakemake entrypoint.
 
 This file currently exposes manifest validation, BUSCO tool preflight,
-per-sample BUSCO execution, and BUSCO QC summarization.
+per-sample BUSCO execution, BUSCO QC summarization, and locus selection.
 """
 
 import csv
@@ -31,6 +31,8 @@ BUSCO_DATASETS = "results/metadata/busco_datasets.txt"
 BUSCO_LINEAGE_VERIFIED = "results/metadata/busco_lineage_verified.tsv"
 BUSCO_SUMMARY_TABLE = "results/qc/busco_summary.tsv"
 BUSCO_RECORDS_TABLE = "results/qc/busco_records.tsv"
+LOCUS_TAXON_MATRIX = "results/qc/locus_taxon_matrix.tsv"
+RETAINED_LOCI_TABLE = "results/qc/retained_loci.tsv"
 SAMPLE_RECORDS = load_sample_records(config["samples"])
 SAMPLES = [row["sample_id"] for row in SAMPLE_RECORDS]
 SAMPLE_TO_ASSEMBLY = {row["sample_id"]: row["assembly_fasta"] for row in SAMPLE_RECORDS}
@@ -45,6 +47,7 @@ BUSCO_SUMMARY_INPUTS = [
 include: "workflow/rules/manifest.smk"
 include: "workflow/rules/busco.smk"
 include: "workflow/rules/busco_summary.smk"
+include: "workflow/rules/locus_matrix.smk"
 
 localrules: all
 
@@ -59,4 +62,6 @@ rule all:
             *BUSCO_COMPLETION_TARGETS,
             BUSCO_SUMMARY_TABLE,
             BUSCO_RECORDS_TABLE,
+            LOCUS_TAXON_MATRIX,
+            RETAINED_LOCI_TABLE,
         ]
