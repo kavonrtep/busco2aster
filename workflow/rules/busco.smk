@@ -34,8 +34,8 @@ rule verify_busco_lineage:
 rule run_busco:
     input:
         assembly=lambda wildcards: SAMPLE_TO_ASSEMBLY[wildcards.sample],
-        validated=VALIDATED_MANIFEST,
-        lineage=BUSCO_LINEAGE_VERIFIED,
+        validated=ancient(VALIDATED_MANIFEST),
+        lineage=ancient(BUSCO_LINEAGE_VERIFIED),
     output:
         command="results/busco/{sample}/command.sh",
         paths="results/busco/{sample}/paths.tsv",
