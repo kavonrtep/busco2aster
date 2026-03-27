@@ -1,0 +1,14 @@
+samples: config/samples.tsv
+results_dir: results
+metadata_dir: results/metadata
+busco_lineage: null
+occupancy_threshold: 0.8
+sequence_type: protein
+alignment_tool: mafft
+trimming_mode: none
+gene_tree_tool: iqtree3
+species_tree_backend: wastral
+threads:
+  busco: 8
+  iqtree: 4
+

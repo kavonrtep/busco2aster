@@ -1,0 +1,12 @@
+.idea/
+hermit/
+
+# Workflow and Python local state
+.snakemake/
+.pytest_cache/
+__pycache__/
+
+# Local outputs and environments
+results/
+work/
+.venv/
