@@ -1,6 +1,6 @@
 rule validate_manifest:
     input:
-        manifest=config["samples"],
+        manifest=SAMPLES_MANIFEST,
     output:
         validated=VALIDATED_MANIFEST,
         taxon_map=TAXON_NAME_MAP,
@@ -14,4 +14,3 @@ rule validate_manifest:
             "--taxon-map-output {output.taxon_map} "
             "--repo-root {params.repo_root}"
         )
-

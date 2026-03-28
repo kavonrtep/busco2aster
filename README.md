@@ -37,7 +37,7 @@ Current v1 defaults in [config/config.yaml](/home/petr/PycharmProjects/get_phylo
 
 ## Requirements
 
-You need:
+For native execution you need:
 
 - Python 3
 - Snakemake
@@ -45,7 +45,14 @@ You need:
 - `curl`
 - `make` and a working C/C++ toolchain for ASTER
 
-BUSCO and MAFFT are provided through rule-specific Conda environments. IQ-TREE 3 and ASTER are installed into `work/tools/`.
+For containerized execution you need:
+
+- Apptainer or Singularity
+
+Native mode uses rule-specific Conda environments for BUSCO and MAFFT. IQ-TREE 3
+and ASTER can be installed locally into `work/tools/`. The container image bakes
+Snakemake, IQ-TREE 3, ASTER, and the rule Conda environments into a single
+`.sif` image.
 
 ## Input Format
 
@@ -62,6 +69,8 @@ python3 -m scripts.normalize_manifest --input test_data/genome_set2.csv --output
 ```
 
 ## Quick Start
+
+### Native Mode
 
 Install external tree-building tools:
 
@@ -94,6 +103,38 @@ For a dry-run:
 snakemake -n -p --cores 4 results/report/report.md
 ```
 
+### Container Mode
+
+Build the image locally:
+
+```bash
+apptainer build busco2aster.sif busco2aster.def
+```
+
+Run the wrapper from a bind-mounted project directory:
+
+```bash
+apptainer run -B "$(pwd)" busco2aster.sif \
+  -c config/config.yaml \
+  --repo-root "$(pwd)" \
+  --directory "$(pwd)" \
+  -t 4 \
+  --target results/report/report.md \
+  --snakemake-args="--dry-run"
+```
+
+The same command works with `singularity run`. The wrapper:
+
+- validates that the config, manifest, and assembly paths are visible
+- prints suggested `-B` bind mounts if anything is missing
+- injects container-internal paths for IQ-TREE 3 and ASTER
+- runs Snakemake with `/opt/conda/envs` as the shared Conda prefix
+
+Important runtime rule:
+
+- keep `results/`, `work/`, `.snakemake/`, `.cache/`, and BUSCO downloads on the
+  host bind-mounted directory, not inside the image
+
 ## Main Outputs
 
 Key outputs are:
@@ -116,8 +157,10 @@ Useful validation commands:
 
 ```bash
 snakemake -n
+snakemake -s workflow/Snakefile_create_envs -n
+python3 run_pipeline.py --config config/config.yaml --repo-root . --directory . --target results/metadata/samples.validated.tsv --snakemake-args="--dry-run"
 python3 -m unittest discover -s tests -v
 git status --short
 ```
 
-Design notes live in [docs/problem_formulation.md](/home/petr/PycharmProjects/get_phylo/docs/problem_formulation.md), [docs/implementation_consolidated.md](/home/petr/PycharmProjects/get_phylo/docs/implementation_consolidated.md), and [docs/implementation_phases.md](/home/petr/PycharmProjects/get_phylo/docs/implementation_phases.md).
+Design notes live in [docs/problem_formulation.md](/home/petr/PycharmProjects/get_phylo/docs/problem_formulation.md), [docs/implementation_consolidated.md](/home/petr/PycharmProjects/get_phylo/docs/implementation_consolidated.md), [docs/implementation_phases.md](/home/petr/PycharmProjects/get_phylo/docs/implementation_phases.md), and [docs/containerization_plan.md](/home/petr/PycharmProjects/get_phylo/docs/containerization_plan.md).

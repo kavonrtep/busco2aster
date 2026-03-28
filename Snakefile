@@ -28,7 +28,18 @@ def get_thread_count(name: str) -> int:
     return int(thread_config.get(name, thread_config.get("default", 4)))
 
 
-REPO_ROOT = Path(workflow.basedir).resolve()
+WORKFLOW_ROOT = Path(workflow.basedir).resolve()
+REPO_ROOT = Path(str(config.get("repo_root", WORKFLOW_ROOT))).resolve()
+
+
+def resolve_repo_path(path_text: str) -> Path:
+    path = Path(path_text)
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+SAMPLES_MANIFEST = resolve_repo_path(str(config["samples"])).as_posix()
+BUSCO_DOWNLOAD_PATH = resolve_repo_path(str(config["busco_download_path"])).as_posix()
+
 VALIDATED_MANIFEST = "results/metadata/samples.validated.tsv"
 TAXON_NAME_MAP = "results/metadata/taxon_name_map.tsv"
 BUSCO_TOOL_VERSIONS = "results/metadata/busco_tool_versions.tsv"
@@ -54,9 +65,12 @@ WASTRAL_OUTPUTS = species_tree_output_paths("wastral")
 ASTRAL4_OUTPUTS = species_tree_output_paths("astral4")
 SPECIES_TREE_COMPLETE = f"{SPECIES_TREE_DIR}/species_tree.complete"
 REPORT_MARKDOWN = "results/report/report.md"
-SAMPLE_RECORDS = load_sample_records(config["samples"])
+SAMPLE_RECORDS = load_sample_records(SAMPLES_MANIFEST)
 SAMPLES = [row["sample_id"] for row in SAMPLE_RECORDS]
-SAMPLE_TO_ASSEMBLY = {row["sample_id"]: row["assembly_fasta"] for row in SAMPLE_RECORDS}
+SAMPLE_TO_ASSEMBLY = {
+    row["sample_id"]: resolve_repo_path(row["assembly_fasta"]).as_posix()
+    for row in SAMPLE_RECORDS
+}
 BUSCO_OUTPUTS = {sample: busco_output_paths(sample) for sample in SAMPLES}
 BUSCO_COMPLETION_TARGETS = [BUSCO_OUTPUTS[sample]["completion"] for sample in SAMPLES]
 BUSCO_SUMMARY_INPUTS = [

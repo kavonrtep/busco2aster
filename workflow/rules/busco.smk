@@ -5,7 +5,7 @@ rule capture_busco_metadata:
     conda:
         "../envs/busco.yaml"
     params:
-        download_path=config["busco_download_path"],
+        download_path=BUSCO_DOWNLOAD_PATH,
     shell:
         r"""
         mkdir -p "$(dirname {output.versions})"
@@ -46,7 +46,7 @@ rule run_busco:
         sample_dir="results/busco/{sample}",
         raw_root="results/busco/{sample}/raw",
         lineage=config["busco_lineage"],
-        download_path=config["busco_download_path"],
+        download_path=BUSCO_DOWNLOAD_PATH,
     threads:
         get_thread_count("busco")
     conda:

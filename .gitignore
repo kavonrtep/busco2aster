@@ -5,9 +5,12 @@ hermit/
 .snakemake/
 .pytest_cache/
 __pycache__/
+.cache/
+tmp/
 
 # Local outputs and environments
 results/
 work/
 .venv/
 busco_downloads/
+*.sif

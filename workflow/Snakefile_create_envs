@@ -1,0 +1,16 @@
+"""
+Dummy workflow for pre-creating all conda environments during container build.
+
+This avoids running --conda-create-envs-only against the main Snakefile, which
+contains checkpoints and dynamic inputs. The helper rules live in
+workflow/rules/_create_envs.smk so that the relative ../envs/ paths match the
+real rules exactly, producing the same Snakemake env hashes at build time and
+runtime.
+"""
+
+include: "rules/_create_envs.smk"
+
+
+rule all:
+    input:
+        expand("/tmp/busco2aster_env_{env}", env=["busco", "alignment"])

@@ -12,3 +12,4 @@ Current Phase 9 rule set:
 - `gene_trees.smk`: per-locus IQ-TREE 3 inference plus aggregate gene-tree exports
 - `species_tree.smk`: ASTER integration, including `wastral` input normalization and the default species-tree rule
 - `report.smk`: final Markdown report generation from QC tables and species-tree outputs
+- `_create_envs.smk`: dummy rules used only during container build to pre-create Conda environments with the same relative env YAML paths as the real rules

@@ -1,0 +1,72 @@
+Bootstrap: docker
+From: continuumio/miniconda3
+
+%files
+    Snakefile /opt/pipeline/Snakefile
+    workflow /opt/pipeline/workflow
+    scripts /opt/pipeline/scripts
+    config /opt/pipeline/config
+    docs /opt/pipeline/docs
+    README.md /opt/pipeline/README.md
+    AGENTS.md /opt/pipeline/AGENTS.md
+    run_pipeline.py /opt/pipeline/run_pipeline.py
+
+%post
+    apt-get update && apt-get install -y \
+        ca-certificates \
+        curl \
+        gcc \
+        g++ \
+        git \
+        libxml2 \
+        libxml2-dev \
+        make \
+        zlib1g-dev
+
+    mkdir -p /opt/conda/config
+    export CONDARC=/opt/conda/config/.condarc
+    export CONDA_PLUGINS_AUTO_ACCEPT_TOS=yes
+
+    conda install -y python=3.11
+    conda install -y -c bioconda -c conda-forge snakemake=8.12.0 pyyaml
+    conda config --set channel_priority strict
+    conda init bash
+
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> /etc/profile
+    echo "conda activate base" >> /etc/profile
+
+    . /opt/conda/etc/profile.d/conda.sh
+    conda activate base
+
+    chmod +x /opt/pipeline/run_pipeline.py
+
+    cd /opt/pipeline
+    python3 -m scripts.install_iqtree3 --install-root /opt/tools/iqtree3
+    python3 -m scripts.install_aster --install-root /opt/tools/aster
+
+    snakemake --snakefile workflow/Snakefile_create_envs \
+        --use-conda \
+        --conda-prefix /opt/conda/envs \
+        --conda-create-envs-only \
+        --cores 4 \
+        --conda-frontend conda
+
+    conda clean --all -y
+
+    apt-get remove --purge -y gcc g++ make git libxml2-dev zlib1g-dev
+    apt-get autoremove -y
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+    chmod -R 777 /root
+
+%environment
+    export PATH=/opt/conda/bin:/opt/tools/iqtree3/current/bin:/opt/tools/aster/current/bin:$PATH
+    export CONDA_ENVS_PATH=/opt/conda/envs
+    export CONDA_PREFIX=/opt/conda
+    export CONDARC=/opt/conda/config/.condarc
+    export PYTHONPATH=/opt/pipeline
+    export HOME=/root
+
+%runscript
+    python3 /opt/pipeline/run_pipeline.py "$@"
