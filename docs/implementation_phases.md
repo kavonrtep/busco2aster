@@ -6,9 +6,9 @@ This document turns the consolidated design into an execution plan. It is organi
 Use this document as the build order for the workflow. [`implementation_consolidated.md`](/home/petr/PycharmProjects/get_phylo/docs/implementation_consolidated.md) remains the architectural decision record; this file is the delivery plan.
 
 ## Current Status
-- Completed: Phases 0 through 7
-- Current target: Phase 8
-- Pending after that: Phase 9
+- Completed: Phases 0 through 9
+- Current target: Phase 10
+- Pending after that: none
 
 ## Phase 0: Repository Bootstrap (Completed)
 ### Scope
@@ -245,7 +245,7 @@ Run the default species-tree backend and keep the topology-only comparison path 
 ### Exit Criteria
 The workflow can infer a default species tree with ASTER and optionally compare it against a topology-only `astral4` run.
 
-## Phase 9: Reporting and Concordance Summaries
+## Phase 9: Reporting and Concordance Summaries (Completed)
 ### Scope
 Produce the final audit trail and downstream QC report.
 

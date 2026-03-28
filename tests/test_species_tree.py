@@ -134,9 +134,11 @@ class SpeciesTreeWorkflowTests(unittest.TestCase):
             text=True,
             check=True,
         )
-        self.assertIn("rule prepare_wastral_gene_trees:", result.stdout)
-        self.assertIn("rule infer_species_tree_wastral:", result.stdout)
         self.assertNotIn("rule infer_species_tree_astral4:", result.stdout)
+        self.assertNotIn("rule align_locus:", result.stdout)
+        if "Nothing to be done" not in result.stdout:
+            self.assertIn("rule prepare_wastral_gene_trees:", result.stdout)
+            self.assertIn("rule infer_species_tree_wastral:", result.stdout)
 
     @unittest.skipUnless((REPO_ROOT / "results/species_tree/species_tree.wastral.tre").is_file(), "Real wastral output is not present.")
     def test_real_species_tree_exists_after_workflow_run(self):

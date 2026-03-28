@@ -5,6 +5,7 @@ rule export_retained_fastas:
     output:
         raw_fastas=directory(RAW_FASTA_DIR),
         manifest=RAW_FASTA_MANIFEST,
+        completion="results/loci/raw_fastas.complete",
     params:
         repo_root=str(REPO_ROOT),
     shell:
@@ -14,14 +15,14 @@ rule export_retained_fastas:
             "--retained {input.retained:q} "
             "--output-dir {output.raw_fastas:q} "
             "--manifest {output.manifest:q} "
-            "--repo-root {params.repo_root:q}"
+            "--repo-root {params.repo_root:q} "
+            "&& touch {output.completion:q}"
         )
 
 
 rule align_locus:
     input:
-        manifest=RAW_FASTA_MANIFEST,
-        raw_fastas=rules.export_retained_fastas.output.raw_fastas,
+        export_complete=ancient(rules.export_retained_fastas.output.completion),
     output:
         alignment="results/loci/alignments/{locus_id}.aln.faa",
     log:

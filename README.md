@@ -3,11 +3,11 @@
 This repository will host a reproducible phylogenomics workflow built with
 Snakemake.
 
-Current status: Phase 8 species-tree inference is implemented. The repository now has a normalized
+Current status: Phase 9 reporting is implemented. The repository now has a normalized
 sample sheet, BUSCO tool preflight and per-sample execution, stable BUSCO QC
 tables, locus-level retention decisions, batched retained-protein FASTA export,
 per-locus MAFFT alignments, IQ-TREE 3 gene-tree inference, and ASTER-based
-species-tree rules with `wastral` as the default backend.
+species-tree rules with `wastral` as the default backend, plus a final Markdown QC report.
 
 Useful commands:
 
@@ -25,6 +25,7 @@ python3 -m scripts.install_iqtree3
 python3 -m scripts.install_aster
 snakemake --cores 4 results/gene_trees/gene_trees.complete
 snakemake --cores 4 results/species_tree/species_tree.complete
+snakemake --cores 4 results/report/report.md
 python3 -m scripts.normalize_manifest --input test_data/genome_set2.csv --output /tmp/samples.tsv
 python3 -m unittest discover -s tests -v
 ```

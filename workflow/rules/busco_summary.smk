@@ -1,6 +1,6 @@
 rule summarize_busco:
     input:
-        manifest=VALIDATED_MANIFEST,
+        manifest=ancient(VALIDATED_MANIFEST),
         busco_artifacts=BUSCO_SUMMARY_INPUTS,
     output:
         summary=BUSCO_SUMMARY_TABLE,

@@ -1,10 +1,10 @@
 """
-Phase 8 Snakemake entrypoint.
+Phase 9 Snakemake entrypoint.
 
 This file currently exposes manifest validation, BUSCO tool preflight,
 per-sample BUSCO execution, BUSCO QC summarization, locus selection,
 batched retained-locus FASTA export, alignment, per-locus gene trees,
-and ASTER species-tree inference.
+ASTER species-tree inference, and final report generation.
 """
 
 import csv
@@ -53,6 +53,7 @@ DEFAULT_SPECIES_TREE_OUTPUTS = species_tree_output_paths(SPECIES_TREE_BACKEND)
 WASTRAL_OUTPUTS = species_tree_output_paths("wastral")
 ASTRAL4_OUTPUTS = species_tree_output_paths("astral4")
 SPECIES_TREE_COMPLETE = f"{SPECIES_TREE_DIR}/species_tree.complete"
+REPORT_MARKDOWN = "results/report/report.md"
 SAMPLE_RECORDS = load_sample_records(config["samples"])
 SAMPLES = [row["sample_id"] for row in SAMPLE_RECORDS]
 SAMPLE_TO_ASSEMBLY = {row["sample_id"]: row["assembly_fasta"] for row in SAMPLE_RECORDS}
@@ -85,6 +86,7 @@ include: "workflow/rules/locus_matrix.smk"
 include: "workflow/rules/alignment.smk"
 include: "workflow/rules/gene_trees.smk"
 include: "workflow/rules/species_tree.smk"
+include: "workflow/rules/report.smk"
 
 
 localrules: all
@@ -97,6 +99,7 @@ rule alignments_complete:
             LOCUS_TAXON_MATRIX,
             RETAINED_LOCI_TABLE,
             RAW_FASTA_MANIFEST,
+            "results/loci/raw_fastas.complete",
             retained_alignment_targets,
         ]
     output:
@@ -117,7 +120,6 @@ rule gene_trees_complete:
 rule species_tree_complete:
     input:
         [
-            GENE_TREES_COMPLETE,
             DEFAULT_SPECIES_TREE_OUTPUTS["treefile"],
             DEFAULT_SPECIES_TREE_OUTPUTS["log"],
             DEFAULT_SPECIES_TREE_OUTPUTS["completion"],
@@ -147,4 +149,5 @@ rule all:
             DEFAULT_SPECIES_TREE_OUTPUTS["treefile"],
             DEFAULT_SPECIES_TREE_OUTPUTS["log"],
             SPECIES_TREE_COMPLETE,
+            REPORT_MARKDOWN,
         ]
