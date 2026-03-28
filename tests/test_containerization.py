@@ -58,6 +58,21 @@ class ContainerizationUnitTests(unittest.TestCase):
 
 
 class ContainerizationWorkflowTests(unittest.TestCase):
+    def test_container_definition_links_cli_tools_into_usr_local_bin(self):
+        definition_text = (REPO_ROOT / "busco2aster.def").read_text(encoding="utf-8")
+        self.assertIn(
+            "ln -sf /opt/tools/iqtree3/current/bin/iqtree3 /usr/local/bin/iqtree3",
+            definition_text,
+        )
+        self.assertIn(
+            "ln -sf /opt/tools/aster/current/bin/wastral /usr/local/bin/wastral",
+            definition_text,
+        )
+        self.assertIn(
+            "ln -sf /opt/tools/aster/current/bin/astral4 /usr/local/bin/astral4",
+            definition_text,
+        )
+
     def test_create_env_helper_workflow_dry_run_renders_expected_rules(self):
         result = subprocess.run(
             ["snakemake", "-s", "workflow/Snakefile_create_envs", "-n", "-p"],

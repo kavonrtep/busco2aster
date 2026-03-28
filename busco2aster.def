@@ -44,6 +44,10 @@ From: continuumio/miniconda3
     python3 -m scripts.install_iqtree3 --install-root /opt/tools/iqtree3
     python3 -m scripts.install_aster --install-root /opt/tools/aster
 
+    ln -sf /opt/tools/iqtree3/current/bin/iqtree3 /usr/local/bin/iqtree3
+    ln -sf /opt/tools/aster/current/bin/wastral /usr/local/bin/wastral
+    ln -sf /opt/tools/aster/current/bin/astral4 /usr/local/bin/astral4
+
     snakemake --snakefile workflow/Snakefile_create_envs \
         --use-conda \
         --conda-prefix /opt/conda/envs \
