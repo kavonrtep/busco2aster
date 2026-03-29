@@ -37,6 +37,8 @@ def build_aster_command(
     output_path: str,
     threads: int,
     support_mode: str | None = None,
+    score_constraint_tree: bool = False,
+    constraint_path: str | None = None,
     mapping_path: str | None = None,
     root_outgroup: str | None = None,
     annotation_mode: int | None = None,
@@ -62,10 +64,16 @@ def build_aster_command(
                 f"Unsupported wASTRAL support mode {support_mode!r}; "
                 f"expected one of {sorted(SUPPORTED_WASTRAL_SUPPORT_MODES)}."
             )
+        if score_constraint_tree:
+            command.append("-C")
         if support_mode == "abayes":
             command.append("-B")
         else:
             command.append("-S")
+    elif score_constraint_tree:
+        raise ValueError("Constraint-tree scoring mode is only supported for the wastral backend.")
+    if constraint_path:
+        command.extend(["-c", constraint_path])
     if mapping_path:
         command.extend(["-a", mapping_path])
     if root_outgroup:
@@ -75,11 +83,23 @@ def build_aster_command(
     return command
 
 
-def write_species_tree_command_script(path: Path, command: list[str], stderr_path: Path) -> None:
+def write_species_tree_command_script(
+    path: Path,
+    command: list[str],
+    stderr_path: Path,
+    cwd: Path | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     rendered = " ".join(shlex.quote(token) for token in command)
-    rendered = f"{rendered} 2> {shlex.quote(stderr_path.as_posix())}"
-    path.write_text(f"#!/usr/bin/env bash\nset -euo pipefail\n{rendered}\n", encoding="utf-8")
+    stderr_target = stderr_path
+    if cwd is not None and not stderr_target.is_absolute():
+        stderr_target = (Path.cwd() / stderr_target).resolve()
+    rendered = f"{rendered} 2> {shlex.quote(stderr_target.as_posix())}"
+    lines = ["#!/usr/bin/env bash", "set -euo pipefail"]
+    if cwd is not None:
+        lines.append(f"cd {shlex.quote(cwd.as_posix())}")
+    lines.append(rendered)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     path.chmod(0o755)
 
 

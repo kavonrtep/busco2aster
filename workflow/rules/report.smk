@@ -8,6 +8,8 @@ rule render_report:
         species_tree_complete=DEFAULT_SPECIES_TREE_OUTPUTS["completion"],
         gcf_stat=GCF_OUTPUTS["stat"],
         scfl_stat=SCFL_OUTPUTS["stat"],
+        quartet_tree=WASTRAL_QUARTET_OUTPUTS["tree"],
+        quartet_freqquad=WASTRAL_QUARTET_OUTPUTS["freqquad"],
     output:
         REPORT_MARKDOWN,
     params:
@@ -23,5 +25,7 @@ rule render_report:
             "--backend {params.backend:q} "
             "--concordance-path {input.gcf_stat:q} "
             "--concordance-path {input.scfl_stat:q} "
+            "--concordance-path {input.quartet_tree:q} "
+            "--concordance-path {input.quartet_freqquad:q} "
             "--output {output:q}"
         )

@@ -7,7 +7,7 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from .concordance import summarize_gcf_stat, summarize_scfl_stat
+from .concordance import summarize_freqquad, summarize_gcf_stat, summarize_scfl_stat
 from .gene_trees import read_single_line_tree
 
 
@@ -219,8 +219,13 @@ def render_report(
         (path for path in valid_concordance_paths if path.name == "scfl.cf.stat"),
         None,
     )
+    freqquad_path = next(
+        (path for path in valid_concordance_paths if path.name.endswith(".freqquad.tsv")),
+        None,
+    )
     gcf_summary = summarize_gcf_stat(gcf_stat_path) if gcf_stat_path else None
     scfl_summary = summarize_scfl_stat(scfl_stat_path) if scfl_stat_path else None
+    freqquad_summary = summarize_freqquad(freqquad_path) if freqquad_path else None
     now = datetime.now().astimezone().isoformat(timespec="seconds")
 
     busco_table = markdown_table(
@@ -380,6 +385,46 @@ def render_report(
                 "Lowest-sCFL branches:",
                 "",
                 markdown_table(["Branch ID", "sCFL", "Informative sites"], low_rows),
+                "",
+            ]
+        )
+
+    if freqquad_summary:
+        low_rows = [
+            [
+                row["node_id"],
+                row["best_topology"],
+                row["best_split"],
+                f"{row['best_frequency']:.3f}",
+                f"{row['local_posterior']:.3f}",
+                f"{row['weighted_support']:.2f}",
+                f"{row['total_weight']:.2f}",
+            ]
+            for row in freqquad_summary["lowest_rows"]
+        ]
+        lines.extend(
+            [
+                f"- ASTER quartet-scored branches: `{freqquad_summary['node_count']}`",
+                f"- ASTER branches with non-zero quartet weight: `{freqquad_summary['scored_node_count']}`",
+                f"- Mean ASTER best quartet frequency: `{freqquad_summary['mean_best_frequency']:.3f}`",
+                f"- Median ASTER best quartet frequency: `{freqquad_summary['median_best_frequency']:.3f}`",
+                f"- Min ASTER best quartet frequency: `{freqquad_summary['min_best_frequency']:.3f}`",
+                f"- Max ASTER best quartet frequency: `{freqquad_summary['max_best_frequency']:.3f}`",
+                "",
+                "Lowest-confidence ASTER quartet branches:",
+                "",
+                markdown_table(
+                    [
+                        "Node ID",
+                        "Best topology",
+                        "Split",
+                        "Quartet frequency",
+                        "Local PP",
+                        "Weighted support",
+                        "Total quartet weight",
+                    ],
+                    low_rows,
+                ),
                 "",
             ]
         )

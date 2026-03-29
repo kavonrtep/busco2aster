@@ -25,6 +25,8 @@ class ReportUnitTests(unittest.TestCase):
             species_log_path = tmp_path / "species_tree.log"
             gcf_stat_path = tmp_path / "gcf.cf.stat"
             scfl_stat_path = tmp_path / "scfl.cf.stat"
+            freqquad_path = tmp_path / "wastral_quartets.freqquad.tsv"
+            quartet_tree_path = tmp_path / "wastral_quartets.annotated.tre"
 
             write_text(
                 busco_path,
@@ -112,6 +114,19 @@ class ReportUnitTests(unittest.TestCase):
                 "4\t76.20\t15\t10.00\t2\t13.80\t3\t20\t\t0.1\n"
                 "5\t31.50\t6\t20.00\t4\t48.50\t10\t20\t\t0.2\n",
             )
+            write_text(
+                freqquad_path,
+                "N1\tt1\t{d}|{e}#{c}|{a,b}\t0.952381\t3\t3\n"
+                "N1\tt2\t{a,b}|{e}#{c}|{d}\t0.0238095\t0\t3\n"
+                "N1\tt3\t{d}|{a,b}#{c}|{e}\t0.0238095\t0\t3\n"
+                "N2\tt1\t{d,e}|{c}#{b}|{a}\t0.777777\t4\t10\n"
+                "N2\tt2\t{a}|{c}#{b}|{d,e}\t0.111111\t3\t10\n"
+                "N2\tt3\t{d,e}|{a}#{b}|{c}\t0.111111\t3\t10\n",
+            )
+            write_text(
+                quartet_tree_path,
+                "((((d,e)'[localPP=0.952381;q1=1;q2=0;q3=0]':0.1,c)'[localPP=0.333333;q1=0;q2=0;q3=0]':0.1,b),a);\n",
+            )
 
             report_text = render_report(
                 busco_summary_path=busco_path,
@@ -120,7 +135,7 @@ class ReportUnitTests(unittest.TestCase):
                 species_tree_path=species_tree_path,
                 species_tree_log_path=species_log_path,
                 species_tree_backend="wastral",
-                concordance_paths=[gcf_stat_path, scfl_stat_path],
+                concordance_paths=[gcf_stat_path, scfl_stat_path, quartet_tree_path, freqquad_path],
             )
 
         for title in REPORT_SECTION_TITLES:
@@ -131,10 +146,13 @@ class ReportUnitTests(unittest.TestCase):
         self.assertIn("species_tree.tre", report_text)
         self.assertIn("Mean gCF", report_text)
         self.assertIn("Mean sCFL", report_text)
+        self.assertIn("Mean ASTER best quartet frequency", report_text)
         self.assertIn("Lowest-gCF branches", report_text)
         self.assertIn("Lowest-sCFL branches", report_text)
+        self.assertIn("Lowest-confidence ASTER quartet branches", report_text)
         self.assertIn("gcf.cf.stat", report_text)
         self.assertIn("scfl.cf.stat", report_text)
+        self.assertIn("wastral_quartets.freqquad.tsv", report_text)
 
     def test_render_report_handles_missing_optional_concordance_paths(self):
         with TemporaryDirectory() as tmpdir:
@@ -200,6 +218,7 @@ class ReportWorkflowTests(unittest.TestCase):
             self.assertIn("results/species_tree/species_tree.wastral.tre", result.stdout)
             self.assertIn("results/concordance/gcf.cf.stat", result.stdout)
             self.assertIn("results/concordance/scfl.cf.stat", result.stdout)
+            self.assertIn("results/concordance/wastral_quartets.freqquad.tsv", result.stdout)
         else:
             self.assertIn("Updating job render_report.", result.stdout)
 

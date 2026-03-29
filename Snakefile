@@ -13,7 +13,7 @@ from pathlib import Path
 
 from scripts.alignment import load_retained_locus_ids, locus_output_paths
 from scripts.busco import busco_output_paths
-from scripts.concordance import concordance_output_paths
+from scripts.concordance import concordance_output_paths, quartet_output_paths
 from scripts.gene_trees import gene_tree_output_paths
 from scripts.species_tree import species_tree_output_paths
 
@@ -67,6 +67,7 @@ WASTRAL_OUTPUTS = species_tree_output_paths("wastral")
 ASTRAL4_OUTPUTS = species_tree_output_paths("astral4")
 GCF_OUTPUTS = concordance_output_paths("gcf")
 SCFL_OUTPUTS = concordance_output_paths("scfl")
+WASTRAL_QUARTET_OUTPUTS = quartet_output_paths()
 SPECIES_TREE_COMPLETE = f"{SPECIES_TREE_DIR}/species_tree.complete"
 REPORT_MARKDOWN = "results/report/report.md"
 SAMPLE_RECORDS = load_sample_records(SAMPLES_MANIFEST)
@@ -170,5 +171,6 @@ rule all:
             SPECIES_TREE_COMPLETE,
             GCF_OUTPUTS["stat"],
             SCFL_OUTPUTS["stat"],
+            WASTRAL_QUARTET_OUTPUTS["freqquad"],
             REPORT_MARKDOWN,
         ]

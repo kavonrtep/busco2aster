@@ -7,6 +7,8 @@ from scripts.concordance import (
     build_iqtree_scfl_command,
     build_iqtree_gcf_command,
     concordance_output_paths,
+    quartet_output_paths,
+    summarize_freqquad,
     summarize_gcf_stat,
     summarize_scfl_stat,
 )
@@ -26,6 +28,14 @@ class ConcordanceUnitTests(unittest.TestCase):
         self.assertEqual(paths["branch"], "results/concordance/gcf.cf.branch")
         self.assertEqual(paths["log"], "results/concordance/gcf.log")
         self.assertEqual(paths["completion"], "results/concordance/gcf.complete")
+
+    def test_quartet_output_paths_are_deterministic(self):
+        paths = quartet_output_paths()
+        self.assertEqual(paths["prefix"], "results/concordance/wastral_quartets")
+        self.assertEqual(paths["tree"], "results/concordance/wastral_quartets.annotated.tre")
+        self.assertEqual(paths["freqquad"], "results/concordance/wastral_quartets.freqquad.tsv")
+        self.assertEqual(paths["log"], "results/concordance/wastral_quartets.log")
+        self.assertEqual(paths["completion"], "results/concordance/wastral_quartets.complete")
 
     def test_build_iqtree_gcf_command_renders_expected_flags(self):
         command = build_iqtree_gcf_command(
@@ -108,6 +118,29 @@ class ConcordanceUnitTests(unittest.TestCase):
         self.assertAlmostEqual(summary["min_scfl"], 40.0)
         self.assertAlmostEqual(summary["max_scfl"], 94.44)
         self.assertEqual(summary["lowest_rows"][0]["branch_id"], "6")
+
+    def test_summarize_freqquad_parses_branch_level_quartet_support(self):
+        with TemporaryDirectory() as tmpdir:
+            freqquad_path = Path(tmpdir) / "wastral_quartets.freqquad.tsv"
+            freqquad_path.write_text(
+                "N1\tt1\t{d}|{e}#{c}|{a,b}\t0.952381\t3\t3\n"
+                "N1\tt2\t{a,b}|{e}#{c}|{d}\t0.0238095\t0\t3\n"
+                "N1\tt3\t{d}|{a,b}#{c}|{e}\t0.0238095\t0\t3\n"
+                "N2\tt1\t{d,e}|{c}#{b}|{a}\t0.777777\t4\t10\n"
+                "N2\tt2\t{a}|{c}#{b}|{d,e}\t0.111111\t3\t10\n"
+                "N2\tt3\t{d,e}|{a}#{b}|{c}\t0.111111\t3\t10\n",
+                encoding="utf-8",
+            )
+
+            summary = summarize_freqquad(freqquad_path)
+
+        self.assertEqual(summary["node_count"], 2)
+        self.assertEqual(summary["scored_node_count"], 2)
+        self.assertAlmostEqual(summary["mean_best_frequency"], 0.7, places=6)
+        self.assertAlmostEqual(summary["median_best_frequency"], 0.7, places=6)
+        self.assertAlmostEqual(summary["min_best_frequency"], 0.4, places=6)
+        self.assertAlmostEqual(summary["max_best_frequency"], 1.0, places=6)
+        self.assertEqual(summary["lowest_rows"][0]["node_id"], "N2")
 
 
 class ConcordanceSmokeTests(unittest.TestCase):
@@ -221,6 +254,28 @@ class ConcordanceWorkflowTests(unittest.TestCase):
         else:
             self.assertTrue((REPO_ROOT / "results/concordance/scfl.cf.stat").is_file())
 
+    def test_wastral_quartet_rule_dry_run_renders_expected_rule(self):
+        result = subprocess.run(
+            [
+                "snakemake",
+                "-n",
+                "-p",
+                "--cores",
+                "4",
+                "results/concordance/wastral_quartets.freqquad.tsv",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        if "Nothing to be done" not in result.stdout:
+            self.assertIn("rule annotate_species_tree_quartets:", result.stdout)
+            self.assertIn("results/species_tree/species_tree.wastral.tre", result.stdout)
+            self.assertIn("results/gene_trees/gene_trees.wastral.tre", result.stdout)
+        else:
+            self.assertTrue((REPO_ROOT / "results/concordance/wastral_quartets.freqquad.tsv").is_file())
+
     @unittest.skipUnless((REPO_ROOT / "results/concordance/gcf.cf.stat").is_file(), "Real gCF output is not present.")
     def test_real_gcf_summary_has_scored_branches(self):
         summary = summarize_gcf_stat(REPO_ROOT / "results/concordance/gcf.cf.stat")
@@ -232,6 +287,12 @@ class ConcordanceWorkflowTests(unittest.TestCase):
         summary = summarize_scfl_stat(REPO_ROOT / "results/concordance/scfl.cf.stat")
         self.assertGreater(summary["branch_count"], 0)
         self.assertGreaterEqual(summary["max_scfl"], summary["min_scfl"])
+
+    @unittest.skipUnless((REPO_ROOT / "results/concordance/wastral_quartets.freqquad.tsv").is_file(), "Real ASTER quartet output is not present.")
+    def test_real_freqquad_summary_has_scored_branches(self):
+        summary = summarize_freqquad(REPO_ROOT / "results/concordance/wastral_quartets.freqquad.tsv")
+        self.assertGreater(summary["node_count"], 0)
+        self.assertGreaterEqual(summary["max_best_frequency"], summary["min_best_frequency"])
 
 
 if __name__ == "__main__":

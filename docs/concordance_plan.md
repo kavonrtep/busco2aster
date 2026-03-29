@@ -57,7 +57,7 @@ Why second:
   is stable
 
 ### Phase 3: ASTER Quartet Annotation (Optional)
-Status: next
+Status: completed
 
 Score the fixed `wastral` tree with `wastral -C -c ... -u 3` to emit ASTER-side
 quartet summaries.
@@ -67,21 +67,22 @@ Inputs:
 - `results/gene_trees/gene_trees.wastral.tre`
 
 Outputs:
-- annotated species tree
-- `results/concordance/freqQuad.csv`
+- `results/concordance/wastral_quartets.annotated.tre`
+- `results/concordance/wastral_quartets.freqquad.tsv`
 
 Why optional:
 - useful for quartet-specific diagnostics
-- output naming is less workflow-friendly than IQ-TREE `.cf.stat`
+- upstream output naming is less workflow-friendly than IQ-TREE `.cf.stat`,
+  so the workflow normalizes `freqQuad.csv` into a stable `.freqquad.tsv`
 - better treated as an extra analytical layer after gCF and sCFL are in place
 
 ## Reporting Plan
 - Phase 1 report update: list `gCF` artifacts and summarize branch-level gCF
   ranges or low-concordance branches.
 - Phase 2 report update: add `sCFL` summary alongside `gCF`.
-- Phase 3 report update: optionally list ASTER quartet outputs and selected
-  `q1/q2/q3` summaries.
+- Phase 3 report update: list ASTER quartet outputs and summarize the dominant
+  weighted quartet frequency per branch.
 
 ## Current Decision
-Implement all three phases in order, keeping each phase as a separate commit:
-`gCF`, then `sCFL`, then ASTER quartet annotation.
+All three concordance phases are implemented as separate commits: `gCF`, then
+`sCFL`, then ASTER quartet annotation.

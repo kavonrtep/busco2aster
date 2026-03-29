@@ -41,6 +41,24 @@ class SpeciesTreeUnitTests(unittest.TestCase):
         self.assertIn("-i", command)
         self.assertIn("results/gene_trees/gene_trees.raw.tre", command)
 
+    def test_build_aster_command_supports_constraint_scoring_annotation_mode(self):
+        command = build_aster_command(
+            backend="wastral",
+            executable="wastral",
+            input_path="results/gene_trees/gene_trees.wastral.tre",
+            output_path="results/concordance/wastral_quartets.annotated.tre",
+            threads=4,
+            support_mode="abayes",
+            score_constraint_tree=True,
+            constraint_path="results/species_tree/species_tree.wastral.tre",
+            annotation_mode=3,
+        )
+        self.assertIn("-C", command)
+        self.assertIn("-c", command)
+        self.assertIn("results/species_tree/species_tree.wastral.tre", command)
+        self.assertIn("-u", command)
+        self.assertIn("3", command)
+
     def test_prepare_wastral_gene_tree_input_rewrites_abayes_labels(self):
         with TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -89,6 +107,42 @@ class SpeciesTreeSmokeTests(unittest.TestCase):
         self.assertIn("b", tree_text)
         self.assertIn("c", tree_text)
         self.assertIn("d", tree_text)
+
+    @unittest.skipUnless(WASTRAL_EXECUTABLE.is_file(), "ASTER wastral binary is not installed under work/tools/aster/current.")
+    def test_wastral_scoring_smoke_run_writes_annotated_tree_and_freqquad(self):
+        with TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            raw_gene_trees_path = tmp_path / "gene_trees.raw.tre"
+            gene_trees_path = tmp_path / "gene_trees.wastral.tre"
+            species_tree_path = tmp_path / "species_tree.tre"
+            output_path = tmp_path / "annotated.tre"
+            raw_gene_trees_path.write_text(
+                "(a:0.03,b:0.03,(c:0.001,(d:0.001,e:0.13)1:0.09)0.333:0.001);\n"
+                "(a:0.03,b:0.03,(c:0.001,(d:0.001,e:0.13)1:0.09)0.333:0.001);\n"
+                "(a:0.03,b:0.03,(c:0.001,(d:0.001,e:0.13)1:0.09)0.333:0.001);\n",
+                encoding="utf-8",
+            )
+            species_tree_path.write_text("(a,b,(c,(d,e)));\n", encoding="utf-8")
+            prepare_wastral_gene_tree_input(raw_gene_trees_path, gene_trees_path, support_mode="abayes")
+            command = build_aster_command(
+                backend="wastral",
+                executable=WASTRAL_EXECUTABLE.as_posix(),
+                input_path=gene_trees_path.as_posix(),
+                output_path=output_path.as_posix(),
+                threads=1,
+                support_mode="abayes",
+                score_constraint_tree=True,
+                constraint_path=species_tree_path.as_posix(),
+                annotation_mode=3,
+            )
+            subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, check=True)
+
+            tree_text = read_single_line_tree(output_path)
+            freqquad_text = (tmp_path / "freqQuad.csv").read_text(encoding="utf-8")
+
+        self.assertIn("localPP=", tree_text)
+        self.assertIn("q1=", tree_text)
+        self.assertIn("N1", freqquad_text)
 
     @unittest.skipUnless(ASTRAL4_EXECUTABLE.is_file(), "ASTER astral4 binary is not installed under work/tools/aster/current.")
     def test_astral4_smoke_run_writes_species_tree(self):
