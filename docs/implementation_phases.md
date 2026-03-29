@@ -6,8 +6,8 @@ This document turns the consolidated design into an execution plan. It is organi
 Use this document as the build order for the workflow. [`implementation_consolidated.md`](/home/petr/PycharmProjects/get_phylo/docs/implementation_consolidated.md) remains the architectural decision record; this file is the delivery plan.
 
 ## Current Status
-- Completed: Phases 0 through 9
-- Current target: Phase 10
+- Completed: Phases 0 through 10
+- Current target: none
 - Pending after that: none
 
 ## Phase 0: Repository Bootstrap (Completed)
@@ -217,7 +217,7 @@ Infer one ML tree per locus and preserve branch lengths and support values neede
 ### Exit Criteria
 The workflow produces a complete, support-aware gene-tree set suitable for species-tree inference.
 
-## Phase 8: Species-Tree Inference with ASTER
+## Phase 8: Species-Tree Inference with ASTER (Completed)
 ### Scope
 Run the default species-tree backend and keep the topology-only comparison path optional.
 
@@ -270,7 +270,7 @@ Produce the final audit trail and downstream QC report.
 ### Exit Criteria
 The workflow emits a readable final report that explains what was run, what was retained, and where the main outputs are located.
 
-## Phase 10: End-to-End Validation and Hardening
+## Phase 10: End-to-End Validation and Hardening (Completed)
 ### Scope
 Run the workflow on the real test dataset in stages and close gaps exposed by real execution.
 

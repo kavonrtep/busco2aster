@@ -6,6 +6,14 @@ Containerize `busco2aster` so the full workflow can run reproducibly with
 Apptainer or Singularity, while preserving the current native Snakemake mode for
 development.
 
+## Current Status
+
+- Completed: Phases 1 through 5
+- Current target: none
+- Verified on local build:
+  - smoke tests for `snakemake`, `iqtree3`, `wastral`, and the wrapper
+  - full containerized execution to `results/report/report.md`
+
 This plan is based on the existing container pattern used in the local
 `orthoTE` repository, especially:
 
@@ -117,7 +125,7 @@ That keeps `config/config.yaml` as the single source of truth for native runs.
 
 ## Implementation Phases
 
-### Phase 1: Runtime Contract And Path Audit
+### Phase 1: Runtime Contract And Path Audit (Completed)
 
 Tasks:
 
@@ -134,7 +142,7 @@ Required tests:
 - `apptainer exec <image> bash -lc 'iqtree3 --version'`
 - `apptainer exec <image> bash -lc 'wastral -h >/dev/null'`
 
-### Phase 2: Image Definition And Build-Time Provisioning
+### Phase 2: Image Definition And Build-Time Provisioning (Completed)
 
 Tasks:
 
@@ -152,7 +160,7 @@ Required tests:
 - local `apptainer build busco2aster.sif busco2aster.def`
 - smoke check that the expected binaries exist inside the image
 
-### Phase 3: Wrapper Script
+### Phase 3: Wrapper Script (Completed)
 
 Tasks:
 
@@ -177,7 +185,7 @@ Required tests:
 - dry-run to `results/metadata/samples.validated.tsv`
 - dry-run to `results/report/report.md`
 
-### Phase 4: CI Build And Release
+### Phase 4: CI Build And Release (Completed)
 
 Tasks:
 
@@ -193,7 +201,7 @@ Recommended smoke test in CI:
 - `apptainer exec busco2aster.sif snakemake --version`
 - `apptainer exec busco2aster.sif bash -lc 'iqtree3 --version && wastral -h >/dev/null'`
 
-### Phase 5: User Documentation
+### Phase 5: User Documentation (Completed)
 
 Tasks:
 
