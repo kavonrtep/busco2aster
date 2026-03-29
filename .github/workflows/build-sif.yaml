@@ -47,6 +47,13 @@ jobs:
           apptainer exec busco2aster.sif bash -lc 'iqtree3 --version'
           apptainer exec busco2aster.sif bash -lc 'wastral -h >/dev/null'
           apptainer exec busco2aster.sif python3 /opt/pipeline/run_pipeline.py --help >/dev/null
+          apptainer exec busco2aster.sif snakemake \
+            --snakefile /opt/pipeline/workflow/Snakefile_create_envs \
+            --use-conda \
+            --conda-prefix /opt/conda/envs \
+            --conda-frontend conda \
+            --cores 1 \
+            /tmp/busco2aster_env_report
 
       - name: Upload SIF to GitHub Release
         uses: softprops/action-gh-release@v2

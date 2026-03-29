@@ -31,4 +31,8 @@ rule create_env_report:
     conda:
         "../envs/report.yaml"
     shell:
-        "touch {output}"
+        (
+            "quarto --version >/dev/null && "
+            "Rscript -e 'library(ggtree); library(phangorn)' >/dev/null && "
+            "touch {output}"
+        )
