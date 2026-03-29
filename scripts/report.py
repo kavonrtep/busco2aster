@@ -7,6 +7,7 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
+from .concordance import summarize_gcf_stat
 from .gene_trees import read_single_line_tree
 
 
@@ -210,6 +211,11 @@ def render_report(
     valid_concordance_paths = [
         path for path in (concordance_paths or []) if path.is_file()
     ]
+    gcf_stat_path = next(
+        (path for path in valid_concordance_paths if path.name == "gcf.cf.stat"),
+        None,
+    )
+    gcf_summary = summarize_gcf_stat(gcf_stat_path) if gcf_stat_path else None
     now = datetime.now().astimezone().isoformat(timespec="seconds")
 
     busco_table = markdown_table(
@@ -333,6 +339,26 @@ def render_report(
         "## Concordance Metrics",
     ]
 
+    if gcf_summary:
+        low_rows = [
+            [row["branch_id"], f"{row['gcf']:.2f}", str(row["gn"])]
+            for row in gcf_summary["lowest_rows"]
+        ]
+        lines.extend(
+            [
+                f"- gCF branches scored: `{gcf_summary['branch_count']}`",
+                f"- Mean gCF: `{gcf_summary['mean_gcf']:.2f}`",
+                f"- Median gCF: `{gcf_summary['median_gcf']:.2f}`",
+                f"- Min gCF: `{gcf_summary['min_gcf']:.2f}`",
+                f"- Max gCF: `{gcf_summary['max_gcf']:.2f}`",
+                "",
+                "Lowest-gCF branches:",
+                "",
+                markdown_table(["Branch ID", "gCF", "Decisive gene trees"], low_rows),
+                "",
+            ]
+        )
+
     if valid_concordance_paths:
         lines.append("Available concordance artifacts:")
         lines.append("")
@@ -355,6 +381,10 @@ def render_report(
                     ["Gene-tree manifest", gene_tree_manifest_path.as_posix()],
                     ["Species tree", species_tree_path.as_posix()],
                     ["Species-tree log", species_tree_log_path.as_posix()],
+                    *[
+                        [f"Concordance artifact {index}", path.as_posix()]
+                        for index, path in enumerate(valid_concordance_paths, start=1)
+                    ],
                 ],
             ),
             "",

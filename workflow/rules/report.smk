@@ -6,6 +6,7 @@ rule render_report:
         species_tree=DEFAULT_SPECIES_TREE_OUTPUTS["treefile"],
         species_tree_log=DEFAULT_SPECIES_TREE_OUTPUTS["log"],
         species_tree_complete=DEFAULT_SPECIES_TREE_OUTPUTS["completion"],
+        gcf_stat=GCF_OUTPUTS["stat"],
     output:
         REPORT_MARKDOWN,
     params:
@@ -19,5 +20,6 @@ rule render_report:
             "--species-tree {input.species_tree:q} "
             "--species-tree-log {input.species_tree_log:q} "
             "--backend {params.backend:q} "
+            "--concordance-path {input.gcf_stat:q} "
             "--output {output:q}"
         )

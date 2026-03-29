@@ -20,5 +20,6 @@ threads:
   default: 4
   alignment: 1
   busco: 4
+  concordance: 4
   iqtree: 1
   species_tree: 4

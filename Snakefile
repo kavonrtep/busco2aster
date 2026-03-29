@@ -1,10 +1,11 @@
 """
-Phase 9 Snakemake entrypoint.
+Snakemake entrypoint for the full busco2aster workflow.
 
 This file currently exposes manifest validation, BUSCO tool preflight,
 per-sample BUSCO execution, BUSCO QC summarization, locus selection,
 batched retained-locus FASTA export, alignment, per-locus gene trees,
-ASTER species-tree inference, and final report generation.
+ASTER species-tree inference, IQ-TREE gCF concordance scoring, and final
+report generation.
 """
 
 import csv
@@ -12,6 +13,7 @@ from pathlib import Path
 
 from scripts.alignment import load_retained_locus_ids, locus_output_paths
 from scripts.busco import busco_output_paths
+from scripts.concordance import concordance_output_paths
 from scripts.gene_trees import gene_tree_output_paths
 from scripts.species_tree import species_tree_output_paths
 
@@ -63,6 +65,7 @@ SPECIES_TREE_BACKEND = str(config.get("species_tree_backend", "wastral"))
 DEFAULT_SPECIES_TREE_OUTPUTS = species_tree_output_paths(SPECIES_TREE_BACKEND)
 WASTRAL_OUTPUTS = species_tree_output_paths("wastral")
 ASTRAL4_OUTPUTS = species_tree_output_paths("astral4")
+GCF_OUTPUTS = concordance_output_paths("gcf")
 SPECIES_TREE_COMPLETE = f"{SPECIES_TREE_DIR}/species_tree.complete"
 REPORT_MARKDOWN = "results/report/report.md"
 SAMPLE_RECORDS = load_sample_records(SAMPLES_MANIFEST)
@@ -100,6 +103,7 @@ include: "workflow/rules/locus_matrix.smk"
 include: "workflow/rules/alignment.smk"
 include: "workflow/rules/gene_trees.smk"
 include: "workflow/rules/species_tree.smk"
+include: "workflow/rules/concordance.smk"
 include: "workflow/rules/report.smk"
 
 
@@ -163,5 +167,6 @@ rule all:
             DEFAULT_SPECIES_TREE_OUTPUTS["treefile"],
             DEFAULT_SPECIES_TREE_OUTPUTS["log"],
             SPECIES_TREE_COMPLETE,
+            GCF_OUTPUTS["stat"],
             REPORT_MARKDOWN,
         ]
