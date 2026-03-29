@@ -7,7 +7,7 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from .concordance import summarize_gcf_stat
+from .concordance import summarize_gcf_stat, summarize_scfl_stat
 from .gene_trees import read_single_line_tree
 
 
@@ -215,7 +215,12 @@ def render_report(
         (path for path in valid_concordance_paths if path.name == "gcf.cf.stat"),
         None,
     )
+    scfl_stat_path = next(
+        (path for path in valid_concordance_paths if path.name == "scfl.cf.stat"),
+        None,
+    )
     gcf_summary = summarize_gcf_stat(gcf_stat_path) if gcf_stat_path else None
+    scfl_summary = summarize_scfl_stat(scfl_stat_path) if scfl_stat_path else None
     now = datetime.now().astimezone().isoformat(timespec="seconds")
 
     busco_table = markdown_table(
@@ -355,6 +360,26 @@ def render_report(
                 "Lowest-gCF branches:",
                 "",
                 markdown_table(["Branch ID", "gCF", "Decisive gene trees"], low_rows),
+                "",
+            ]
+        )
+
+    if scfl_summary:
+        low_rows = [
+            [row["branch_id"], f"{row['scfl']:.2f}", f"{row['sn']:.2f}"]
+            for row in scfl_summary["lowest_rows"]
+        ]
+        lines.extend(
+            [
+                f"- sCFL branches scored: `{scfl_summary['branch_count']}`",
+                f"- Mean sCFL: `{scfl_summary['mean_scfl']:.2f}`",
+                f"- Median sCFL: `{scfl_summary['median_scfl']:.2f}`",
+                f"- Min sCFL: `{scfl_summary['min_scfl']:.2f}`",
+                f"- Max sCFL: `{scfl_summary['max_scfl']:.2f}`",
+                "",
+                "Lowest-sCFL branches:",
+                "",
+                markdown_table(["Branch ID", "sCFL", "Informative sites"], low_rows),
                 "",
             ]
         )

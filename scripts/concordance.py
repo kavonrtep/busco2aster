@@ -23,6 +23,19 @@ GCF_REQUIRED_COLUMNS = {
     "Length",
 }
 
+SCFL_REQUIRED_COLUMNS = {
+    "ID",
+    "sCF",
+    "sCF_N",
+    "sDF1",
+    "sDF1_N",
+    "sDF2",
+    "sDF2_N",
+    "sN",
+    "Label",
+    "Length",
+}
+
 
 def concordance_output_paths(name: str) -> dict[str, str]:
     prefix = Path("results") / "concordance" / name
@@ -52,6 +65,38 @@ def build_iqtree_gcf_command(
         reference_tree_path,
         "--gcf",
         gene_tree_path,
+        "--prefix",
+        prefix,
+        "-T",
+        str(threads),
+        "--redo",
+        "--quiet",
+    ]
+
+
+def build_iqtree_scfl_command(
+    *,
+    executable: str,
+    reference_tree_path: str,
+    alignment_dir: str,
+    prefix: str,
+    threads: int,
+    quartets: int,
+    seqtype: str,
+    model: str,
+) -> list[str]:
+    return [
+        executable,
+        "-te",
+        reference_tree_path,
+        "-p",
+        alignment_dir,
+        "--scfl",
+        str(quartets),
+        "--seqtype",
+        seqtype,
+        "-m",
+        model,
         "--prefix",
         prefix,
         "-T",
@@ -95,35 +140,68 @@ def _parse_optional_int(value: str) -> int | None:
     return int(text)
 
 
-def summarize_gcf_stat(path: Path) -> dict[str, object]:
+def _summarize_cf_stat(
+    *,
+    path: Path,
+    required_columns: set[str],
+    value_column: str,
+    count_column: str,
+    value_output_key: str,
+    count_output_key: str,
+    label: str,
+    count_parser,
+) -> dict[str, object]:
     rows = read_cf_stat_rows(path)
     fieldnames = set(rows[0].keys()) if rows else set()
-    missing = sorted(GCF_REQUIRED_COLUMNS - fieldnames)
+    missing = sorted(required_columns - fieldnames)
     if missing:
-        raise ValueError(
-            f"gCF statistics file is missing required columns: {', '.join(missing)}"
-        )
+        raise ValueError(f"{label} statistics file is missing required columns: {', '.join(missing)}")
 
     scored_rows = [
         {
             "branch_id": row["ID"],
-            "gcf": _parse_optional_float(row["gCF"]),
-            "gcf_n": _parse_optional_int(row["gCF_N"]),
-            "gn": _parse_optional_int(row["gN"]),
+            value_output_key: _parse_optional_float(row[value_column]),
+            count_output_key: count_parser(row[count_column]),
         }
         for row in rows
-        if _parse_optional_float(row["gCF"]) is not None and _parse_optional_int(row["gN"]) is not None
+        if _parse_optional_float(row[value_column]) is not None and count_parser(row[count_column]) is not None
     ]
     if not scored_rows:
-        raise ValueError(f"No scored gCF branches were parsed from {path}")
-    gcf_values = [row["gcf"] for row in scored_rows]
-    lowest_rows = sorted(scored_rows, key=lambda row: (row["gcf"], row["branch_id"]))[:5]
+        raise ValueError(f"No scored {label} branches were parsed from {path}")
+    values = [row[value_output_key] for row in scored_rows]
+    lowest_rows = sorted(scored_rows, key=lambda row: (row[value_output_key], row["branch_id"]))[:5]
 
     return {
         "branch_count": len(scored_rows),
-        "mean_gcf": statistics.fmean(gcf_values),
-        "median_gcf": statistics.median(gcf_values),
-        "min_gcf": min(gcf_values),
-        "max_gcf": max(gcf_values),
+        f"mean_{value_output_key}": statistics.fmean(values),
+        f"median_{value_output_key}": statistics.median(values),
+        f"min_{value_output_key}": min(values),
+        f"max_{value_output_key}": max(values),
         "lowest_rows": lowest_rows,
     }
+
+
+def summarize_gcf_stat(path: Path) -> dict[str, object]:
+    return _summarize_cf_stat(
+        path=path,
+        required_columns=GCF_REQUIRED_COLUMNS,
+        value_column="gCF",
+        count_column="gN",
+        value_output_key="gcf",
+        count_output_key="gn",
+        label="gCF",
+        count_parser=_parse_optional_int,
+    )
+
+
+def summarize_scfl_stat(path: Path) -> dict[str, object]:
+    return _summarize_cf_stat(
+        path=path,
+        required_columns=SCFL_REQUIRED_COLUMNS,
+        value_column="sCF",
+        count_column="sN",
+        value_output_key="scfl",
+        count_output_key="sn",
+        label="sCFL",
+        count_parser=_parse_optional_float,
+    )

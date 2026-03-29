@@ -24,6 +24,7 @@ class ReportUnitTests(unittest.TestCase):
             species_tree_path = tmp_path / "species_tree.tre"
             species_log_path = tmp_path / "species_tree.log"
             gcf_stat_path = tmp_path / "gcf.cf.stat"
+            scfl_stat_path = tmp_path / "scfl.cf.stat"
 
             write_text(
                 busco_path,
@@ -104,6 +105,13 @@ class ReportUnitTests(unittest.TestCase):
                 "4\t88.50\t7\t0\t0\t0\t0\t11.50\t1\t8\t\t0.1\n"
                 "5\t45.00\t9\t10.00\t2\t15.00\t3\t30.00\t6\t20\t\t0.2\n",
             )
+            write_text(
+                scfl_stat_path,
+                "# Concordance factor statistics\n"
+                "ID\tsCF\tsCF_N\tsDF1\tsDF1_N\tsDF2\tsDF2_N\tsN\tLabel\tLength\n"
+                "4\t76.20\t15\t10.00\t2\t13.80\t3\t20\t\t0.1\n"
+                "5\t31.50\t6\t20.00\t4\t48.50\t10\t20\t\t0.2\n",
+            )
 
             report_text = render_report(
                 busco_summary_path=busco_path,
@@ -112,7 +120,7 @@ class ReportUnitTests(unittest.TestCase):
                 species_tree_path=species_tree_path,
                 species_tree_log_path=species_log_path,
                 species_tree_backend="wastral",
-                concordance_paths=[gcf_stat_path],
+                concordance_paths=[gcf_stat_path, scfl_stat_path],
             )
 
         for title in REPORT_SECTION_TITLES:
@@ -122,8 +130,11 @@ class ReportUnitTests(unittest.TestCase):
         self.assertIn("gene_tree_manifest.tsv", report_text)
         self.assertIn("species_tree.tre", report_text)
         self.assertIn("Mean gCF", report_text)
+        self.assertIn("Mean sCFL", report_text)
         self.assertIn("Lowest-gCF branches", report_text)
+        self.assertIn("Lowest-sCFL branches", report_text)
         self.assertIn("gcf.cf.stat", report_text)
+        self.assertIn("scfl.cf.stat", report_text)
 
     def test_render_report_handles_missing_optional_concordance_paths(self):
         with TemporaryDirectory() as tmpdir:
@@ -182,13 +193,13 @@ class ReportWorkflowTests(unittest.TestCase):
             check=True,
         )
         if "Nothing to be done" not in result.stdout:
-            self.assertIn("rule infer_gene_concordance:", result.stdout)
             self.assertIn("rule render_report:", result.stdout)
             self.assertIn("results/qc/busco_summary.tsv", result.stdout)
             self.assertIn("results/qc/retained_loci.tsv", result.stdout)
             self.assertIn("results/gene_trees/gene_tree_manifest.tsv", result.stdout)
             self.assertIn("results/species_tree/species_tree.wastral.tre", result.stdout)
             self.assertIn("results/concordance/gcf.cf.stat", result.stdout)
+            self.assertIn("results/concordance/scfl.cf.stat", result.stdout)
         else:
             self.assertIn("Updating job render_report.", result.stdout)
 

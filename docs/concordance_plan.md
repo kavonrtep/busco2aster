@@ -35,7 +35,7 @@ Required tests:
 - workflow dry-run for `results/concordance/gcf.cf.stat`
 
 ### Phase 2: Site Concordance Factor (sCFL)
-Status: next
+Status: completed
 
 Use IQ-TREE 3 `--scfl` on the same fixed species tree and the retained
 alignment directory.
@@ -57,7 +57,7 @@ Why second:
   is stable
 
 ### Phase 3: ASTER Quartet Annotation (Optional)
-Status: pending
+Status: next
 
 Score the fixed `wastral` tree with `wastral -C -c ... -u 3` to emit ASTER-side
 quartet summaries.

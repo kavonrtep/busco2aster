@@ -66,6 +66,7 @@ DEFAULT_SPECIES_TREE_OUTPUTS = species_tree_output_paths(SPECIES_TREE_BACKEND)
 WASTRAL_OUTPUTS = species_tree_output_paths("wastral")
 ASTRAL4_OUTPUTS = species_tree_output_paths("astral4")
 GCF_OUTPUTS = concordance_output_paths("gcf")
+SCFL_OUTPUTS = concordance_output_paths("scfl")
 SPECIES_TREE_COMPLETE = f"{SPECIES_TREE_DIR}/species_tree.complete"
 REPORT_MARKDOWN = "results/report/report.md"
 SAMPLE_RECORDS = load_sample_records(SAMPLES_MANIFEST)
@@ -168,5 +169,6 @@ rule all:
             DEFAULT_SPECIES_TREE_OUTPUTS["log"],
             SPECIES_TREE_COMPLETE,
             GCF_OUTPUTS["stat"],
+            SCFL_OUTPUTS["stat"],
             REPORT_MARKDOWN,
         ]
