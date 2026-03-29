@@ -83,6 +83,7 @@ class ContainerizationWorkflowTests(unittest.TestCase):
         )
         self.assertIn("rule create_env_busco:", result.stdout)
         self.assertIn("rule create_env_alignment:", result.stdout)
+        self.assertIn("rule create_env_report:", result.stdout)
 
     def test_run_pipeline_wrapper_supports_local_dry_run(self):
         result = subprocess.run(

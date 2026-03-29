@@ -1,6 +1,6 @@
 # busco2aster
 
-`busco2aster` is a Snakemake workflow for building an unrooted species tree from genome assemblies using BUSCO-defined ortholog markers. It is designed to keep the run inspectable: every major stage writes explicit intermediate tables, per-locus files, and a final Markdown report.
+`busco2aster` is a Snakemake workflow for building an unrooted species tree from genome assemblies using BUSCO-defined ortholog markers. It is designed to keep the run inspectable: every major stage writes explicit intermediate tables, per-locus files, a machine-readable Markdown audit report, and a visual HTML report.
 
 ## What the Workflow Does
 
@@ -14,7 +14,8 @@ Given one genome assembly per taxon, the workflow:
 6. aligns loci with MAFFT
 7. infers one gene tree per locus with IQ-TREE 3
 8. infers an unrooted species tree with ASTER `wastral`
-9. renders a final QC and audit report
+9. computes concordance metrics on the final species tree
+10. renders final Markdown and HTML reports
 
 Current v1 defaults in [config/config.yaml](/home/petr/PycharmProjects/get_phylo/config/config.yaml):
 
@@ -49,10 +50,10 @@ For containerized execution you need:
 
 - Apptainer or Singularity
 
-Native mode uses rule-specific Conda environments for BUSCO and MAFFT. IQ-TREE 3
-and ASTER can be installed locally into `work/tools/`. The container image bakes
-Snakemake, IQ-TREE 3, ASTER, and the rule Conda environments into a single
-`.sif` image.
+Native mode uses rule-specific Conda environments for BUSCO, MAFFT, and the
+Quarto/R report step. IQ-TREE 3 and ASTER can be installed locally into
+`work/tools/`. The container image bakes Snakemake, IQ-TREE 3, ASTER, Quarto,
+and the rule Conda environments into a single `.sif` image.
 
 ## Input Format
 
@@ -94,13 +95,14 @@ snakemake --use-conda --conda-frontend conda --cores 4 results/qc/retained_loci.
 snakemake --use-conda --conda-frontend conda --cores 4 results/loci/alignments.complete
 snakemake --cores 4 results/gene_trees/gene_trees.complete
 snakemake --cores 4 results/species_tree/species_tree.complete
-snakemake --cores 4 results/report/report.md
+snakemake --cores 4 results/concordance/gcf.complete results/concordance/scfl.complete results/concordance/wastral_quartets.complete
+snakemake --use-conda --conda-frontend conda --cores 4 results/report/report.html
 ```
 
 For a dry-run:
 
 ```bash
-snakemake -n -p --cores 4 results/report/report.md
+snakemake -n -p --cores 4 results/report/report.html
 ```
 
 ### Container Mode
@@ -119,7 +121,7 @@ apptainer run -B "$(pwd)" busco2aster.sif \
   --repo-root "$(pwd)" \
   --directory "$(pwd)" \
   -t 4 \
-  --target results/report/report.md \
+  --target results/report/report.html \
   --snakemake-args="--dry-run"
 ```
 
@@ -148,8 +150,9 @@ Key outputs are:
 - `results/species_tree/species_tree.wastral.tre`
 - `results/species_tree/species_tree.wastral.log`
 - [results/report/report.md](/home/petr/PycharmProjects/get_phylo/results/report/report.md)
+- [results/report/report.html](/home/petr/PycharmProjects/get_phylo/results/report/report.html)
 
-The final species tree is unrooted. The report summarizes BUSCO completeness, retained-locus counts, occupancy distribution, QC warnings, gene-tree support coverage, and the final species-tree result.
+The final species tree is unrooted. The Markdown report is the compact audit summary. The HTML report adds dataset overview plots, a pipeline diagram, a labeled species tree, branch-level concordance panels, conflict summaries, and gene-tree heterogeneity plots.
 
 ## Testing and Development
 
@@ -163,4 +166,4 @@ python3 -m unittest discover -s tests -v
 git status --short
 ```
 
-Design notes live in [docs/problem_formulation.md](/home/petr/PycharmProjects/get_phylo/docs/problem_formulation.md), [docs/implementation_consolidated.md](/home/petr/PycharmProjects/get_phylo/docs/implementation_consolidated.md), [docs/implementation_phases.md](/home/petr/PycharmProjects/get_phylo/docs/implementation_phases.md), and [docs/containerization_plan.md](/home/petr/PycharmProjects/get_phylo/docs/containerization_plan.md).
+Design notes live in [docs/problem_formulation.md](/home/petr/PycharmProjects/get_phylo/docs/problem_formulation.md), [docs/implementation_consolidated.md](/home/petr/PycharmProjects/get_phylo/docs/implementation_consolidated.md), [docs/implementation_phases.md](/home/petr/PycharmProjects/get_phylo/docs/implementation_phases.md), [docs/containerization_plan.md](/home/petr/PycharmProjects/get_phylo/docs/containerization_plan.md), and [docs/visual_report_plan.md](/home/petr/PycharmProjects/get_phylo/docs/visual_report_plan.md).

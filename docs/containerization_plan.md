@@ -12,7 +12,7 @@ development.
 - Current target: none
 - Verified on local build:
   - smoke tests for `snakemake`, `iqtree3`, `wastral`, and the wrapper
-  - full containerized execution to `results/report/report.md`
+  - full containerized execution to `results/report/report.html`
 
 This plan is based on the existing container pattern used in the local
 `orthoTE` repository, especially:
@@ -82,6 +82,7 @@ Target envs to pre-create now:
 
 - `workflow/envs/busco.yaml`
 - `workflow/envs/alignment.yaml`
+- `workflow/envs/report.yaml`
 
 ### 3. Install IQ-TREE 3 and ASTER during image build
 
@@ -183,7 +184,7 @@ Required tests:
 
 - `apptainer run ... busco2aster.sif --help`
 - dry-run to `results/metadata/samples.validated.tsv`
-- dry-run to `results/report/report.md`
+- dry-run to `results/report/report.html`
 
 ### Phase 4: CI Build And Release (Completed)
 
@@ -225,7 +226,7 @@ The smallest acceptable v1 containerization milestone is:
 1. buildable `busco2aster.def`
 2. working `run_pipeline.py`
 3. CI workflow that builds and uploads `busco2aster.sif`
-4. successful containerized dry-run to `results/report/report.md`
+4. successful containerized dry-run to `results/report/report.html`
 5. successful containerized execution of at least:
    - manifest validation
    - BUSCO lineage verification

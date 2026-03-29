@@ -70,6 +70,17 @@ SCFL_OUTPUTS = concordance_output_paths("scfl")
 WASTRAL_QUARTET_OUTPUTS = quartet_output_paths()
 SPECIES_TREE_COMPLETE = f"{SPECIES_TREE_DIR}/species_tree.complete"
 REPORT_MARKDOWN = "results/report/report.md"
+REPORT_DATA_DIR = "results/report/data"
+REPORT_DATASET_SUMMARY = f"{REPORT_DATA_DIR}/dataset_summary.tsv"
+REPORT_SAMPLE_QC = f"{REPORT_DATA_DIR}/sample_qc.tsv"
+REPORT_LOCUS_SUMMARY = f"{REPORT_DATA_DIR}/locus_summary.tsv"
+REPORT_ALIGNMENT_SUMMARY = f"{REPORT_DATA_DIR}/alignment_summary.tsv"
+REPORT_BRANCH_METRICS = f"{REPORT_DATA_DIR}/branch_metrics.tsv"
+REPORT_BRANCH_ALTERNATIVES = f"{REPORT_DATA_DIR}/branch_alternatives.tsv"
+REPORT_GENE_TREE_HETEROGENEITY = f"{REPORT_DATA_DIR}/gene_tree_heterogeneity.tsv"
+REPORT_TOPOLOGY_COUNTS = f"{REPORT_DATA_DIR}/topology_counts.tsv"
+REPORT_SPECIES_TREE = f"{REPORT_DATA_DIR}/species_tree.report.tre"
+REPORT_HTML = "results/report/report.html"
 SAMPLE_RECORDS = load_sample_records(SAMPLES_MANIFEST)
 SAMPLES = [row["sample_id"] for row in SAMPLE_RECORDS]
 SAMPLE_TO_ASSEMBLY = {
@@ -107,6 +118,7 @@ include: "workflow/rules/gene_trees.smk"
 include: "workflow/rules/species_tree.smk"
 include: "workflow/rules/concordance.smk"
 include: "workflow/rules/report.smk"
+include: "workflow/rules/visual_report.smk"
 
 
 localrules: all
@@ -173,4 +185,5 @@ rule all:
             SCFL_OUTPUTS["stat"],
             WASTRAL_QUARTET_OUTPUTS["freqquad"],
             REPORT_MARKDOWN,
+            REPORT_HTML,
         ]

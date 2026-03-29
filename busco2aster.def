@@ -5,6 +5,7 @@ From: continuumio/miniconda3
     Snakefile /opt/pipeline/Snakefile
     workflow /opt/pipeline/workflow
     scripts /opt/pipeline/scripts
+    reports /opt/pipeline/reports
     config /opt/pipeline/config
     docs /opt/pipeline/docs
     README.md /opt/pipeline/README.md

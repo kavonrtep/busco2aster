@@ -114,7 +114,8 @@ Taxon names should be sanitized once, recorded in `results/metadata/taxon_name_m
 12. `optional_astral4_compare`
     Optional comparison path using topology-only trees and the `astral4` backend.
 13. `concordance_and_report`
-    Compute downstream summaries and render `results/report/report.md`.
+    Compute downstream summaries, render `results/report/report.md`, and render
+    the visual HTML report at `results/report/report.html`.
 
 ## Filtering Policy
 The v1 filter logic should stay strict but minimal:
@@ -147,6 +148,7 @@ The stable deliverables for v1 should be:
 - `results/species_tree/species_tree.wastral.tre`
 - `results/species_tree/species_tree.wastral.log`
 - `results/report/report.md`
+- `results/report/report.html`
 
 Optional comparison outputs can include:
 

@@ -251,7 +251,10 @@ Produce the final audit trail and downstream QC report.
 
 ### Deliverables
 - `results/report/report.md`
-- optional concordance outputs if included in v1
+- `results/report/report.html`
+- `results/concordance/gcf.cf.stat`
+- `results/concordance/scfl.cf.stat`
+- `results/concordance/wastral_quartets.freqquad.tsv`
 - report generation helper scripts
 
 ### Tasks
@@ -259,16 +262,17 @@ Produce the final audit trail and downstream QC report.
 - summarize candidate and retained locus counts
 - report occupancy distribution and duplicated-locus rates
 - summarize species-tree outputs and key runtime metadata
-- add placeholders for concordance metrics if they are not implemented immediately
+- render concordance summaries from `gCF`, `sCFL`, and ASTER quartet outputs
+- keep a compact Markdown audit report beside the visual HTML report
 
 ### Required Tests
 - unit test: report generator renders all required sections
 - integration test: report references the expected upstream artifacts
-- regression test: missing optional concordance metrics do not break report generation
+- integration test: visual HTML report renders from real workflow outputs
 - manual review: report is readable and explains locus retention decisions
 
 ### Exit Criteria
-The workflow emits a readable final report that explains what was run, what was retained, and where the main outputs are located.
+The workflow emits a readable Markdown audit report plus a visual HTML report that explain what was run, what was retained, and where the main outputs are located.
 
 ## Phase 10: End-to-End Validation and Hardening (Completed)
 ### Scope

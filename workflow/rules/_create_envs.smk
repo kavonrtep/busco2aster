@@ -23,3 +23,12 @@ rule create_env_alignment:
         "../envs/alignment.yaml"
     shell:
         "touch {output}"
+
+
+rule create_env_report:
+    output:
+        "/tmp/busco2aster_env_report"
+    conda:
+        "../envs/report.yaml"
+    shell:
+        "touch {output}"

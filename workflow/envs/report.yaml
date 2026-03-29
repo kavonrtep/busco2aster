@@ -1,0 +1,21 @@
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - quarto>=1.5,<2
+  - r-base=4.3
+  - r-ape
+  - r-dplyr
+  - r-ggplot2
+  - r-knitr
+  - r-patchwork
+  - r-phangorn
+  - r-readr
+  - r-rmarkdown
+  - r-scales
+  - r-stringr
+  - r-tidyr
+  - r-tibble
+  - bioconductor-ggtree
+  - bioconductor-treeio
