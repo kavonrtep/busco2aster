@@ -1,0 +1,29 @@
+samples: config/samples.tsv
+busco_lineage: solanales_odb12
+
+# Optional if omitted:
+# - BUSCO datasets download to work/busco_downloads
+# - IQ-TREE 3 / wASTRAL / ASTRAL4 are resolved from PATH
+# - the container wrapper injects container-internal tool paths automatically
+busco_download_path: work/busco_downloads
+occupancy_threshold: 0.8
+species_tree_backend: wastral
+iqtree_model: MFP
+iqtree_support_mode: abayes
+iqtree_seed: 20260327
+iqtree_ufboot_replicates: 1000
+iqtree_scfl_quartets: 100
+iqtree_scfl_model: LG+G4
+
+threads:
+  default: 4
+  alignment: 1
+  busco: 4
+  concordance: 4
+  iqtree: 4
+  species_tree: 4
+
+# Optional local overrides when tools are not on PATH.
+# iqtree_executable: /absolute/path/to/iqtree3
+# wastral_executable: /absolute/path/to/wastral
+# astral4_executable: /absolute/path/to/astral4

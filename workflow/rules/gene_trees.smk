@@ -13,13 +13,13 @@ rule infer_gene_trees:
         checkpoint=GENE_TREE_DIRECTORY_OUTPUTS["checkpoint"],
         parstree=GENE_TREE_DIRECTORY_OUTPUTS["parstree"],
     params:
-        executable=config["iqtree_executable"],
+        executable=IQTREE_EXECUTABLE,
         prefix=GENE_TREE_DIRECTORY_OUTPUTS["prefix"],
         alignment_dir=ALIGNMENT_DIR,
-        model=config["iqtree_model"],
-        support_mode=config["iqtree_support_mode"],
-        seed=int(config["iqtree_seed"]),
-        ufboot_replicates=int(config["iqtree_ufboot_replicates"]),
+        model=IQTREE_MODEL,
+        support_mode=IQTREE_SUPPORT_MODE,
+        seed=IQTREE_SEED,
+        ufboot_replicates=IQTREE_UFBOOT_REPLICATES,
     threads:
         get_thread_count("iqtree")
     run:
@@ -52,7 +52,7 @@ rule aggregate_gene_trees:
         manifest=GENE_TREE_MANIFEST,
         aggregate=GENE_TREE_AGGREGATE,
     params:
-        support_mode=config["iqtree_support_mode"],
+        support_mode=IQTREE_SUPPORT_MODE,
     shell:
         (
             "python3 -m scripts.finalize_gene_trees "

@@ -30,6 +30,7 @@ Current v1 defaults in [config/config.yaml](/home/petr/PycharmProjects/get_phylo
 
 - [config/samples.tsv](/home/petr/PycharmProjects/get_phylo/config/samples.tsv): normalized input manifest
 - [config/config.yaml](/home/petr/PycharmProjects/get_phylo/config/config.yaml): workflow settings
+- [config/config.template.yaml](/home/petr/PycharmProjects/get_phylo/config/config.template.yaml): minimal starting template for new runs
 - [workflow/rules/](/home/petr/PycharmProjects/get_phylo/workflow/rules): Snakemake rules by stage
 - [scripts/](/home/petr/PycharmProjects/get_phylo/scripts): Python helpers and installer utilities
 - [docs/](/home/petr/PycharmProjects/get_phylo/docs): design and implementation notes
@@ -55,6 +56,12 @@ Quarto/R report step. IQ-TREE 3 and ASTER can be installed locally into
 `work/tools/`. The container image bakes Snakemake, IQ-TREE 3, ASTER, Quarto,
 and the rule Conda environments into a single `.sif` image.
 
+Executable path settings are optional. If `iqtree_executable`,
+`wastral_executable`, or `astral4_executable` are omitted from the config, the
+workflow resolves `iqtree3`, `wastral`, and `astral4` from `PATH`. In container
+mode, [run_pipeline.py](/home/petr/PycharmProjects/get_phylo/run_pipeline.py) injects the
+container-internal tool paths automatically.
+
 Current optimization-related behavior:
 
 - BUSCO raw scratch is written under `work/busco/`
@@ -68,6 +75,12 @@ The workflow reads [config/samples.tsv](/home/petr/PycharmProjects/get_phylo/con
 
 ```tsv
 sample_id	taxon_id	assembly_fasta
+```
+
+Start from the minimal config template:
+
+```bash
+cp config/config.template.yaml config/my_run.yaml
 ```
 
 If you start from the reference sheet in `test_data/genome_set2.csv`, normalize it with:

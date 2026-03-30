@@ -4,7 +4,7 @@ rule prepare_wastral_gene_trees:
     output:
         WASTRAL_GENE_TREE_INPUT,
     params:
-        support_mode=config["iqtree_support_mode"],
+        support_mode=IQTREE_SUPPORT_MODE,
     run:
         from pathlib import Path
 
@@ -26,8 +26,8 @@ rule infer_species_tree_wastral:
         log=WASTRAL_OUTPUTS["log"],
         completion=WASTRAL_OUTPUTS["completion"],
     params:
-        executable=config["wastral_executable"],
-        support_mode=config["iqtree_support_mode"],
+        executable=WASTRAL_EXECUTABLE,
+        support_mode=IQTREE_SUPPORT_MODE,
     threads:
         get_thread_count("species_tree")
     run:
@@ -59,7 +59,7 @@ rule infer_species_tree_astral4:
         log=ASTRAL4_OUTPUTS["log"],
         completion=ASTRAL4_OUTPUTS["completion"],
     params:
-        executable=config["astral4_executable"],
+        executable=ASTRAL4_EXECUTABLE,
     threads:
         get_thread_count("species_tree")
     run:

@@ -58,6 +58,38 @@ class ContainerizationUnitTests(unittest.TestCase):
 
 
 class ContainerizationWorkflowTests(unittest.TestCase):
+    def test_minimal_config_template_omits_explicit_executable_paths(self):
+        config_obj = yaml.safe_load(
+            (REPO_ROOT / "config" / "config.template.yaml").read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(config_obj["samples"], "config/samples.tsv")
+        self.assertEqual(config_obj["busco_lineage"], "solanales_odb12")
+        self.assertNotIn("iqtree_executable", config_obj)
+        self.assertNotIn("wastral_executable", config_obj)
+        self.assertNotIn("astral4_executable", config_obj)
+
+    def test_workflow_dry_run_accepts_template_without_executable_paths(self):
+        result = subprocess.run(
+            [
+                "snakemake",
+                "-n",
+                "-p",
+                "-R",
+                "infer_species_tree_wastral",
+                "--configfile",
+                (REPO_ROOT / "config" / "config.template.yaml").as_posix(),
+                "--cores",
+                "4",
+                "results/species_tree/species_tree.wastral.complete",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertIn("rule infer_species_tree_wastral:", result.stdout)
+
     def test_container_definition_links_cli_tools_into_usr_local_bin(self):
         definition_text = (REPO_ROOT / "busco2aster.def").read_text(encoding="utf-8")
         self.assertIn(

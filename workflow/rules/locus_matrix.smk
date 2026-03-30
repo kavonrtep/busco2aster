@@ -19,7 +19,7 @@ checkpoint select_loci:
     output:
         RETAINED_LOCI_TABLE,
     params:
-        occupancy_threshold=float(config["occupancy_threshold"]),
+        occupancy_threshold=OCCUPANCY_THRESHOLD,
     shell:
         (
             "python3 -m scripts.select_loci "

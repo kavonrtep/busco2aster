@@ -40,8 +40,19 @@ def resolve_repo_path(path_text: str) -> Path:
 
 
 SAMPLES_MANIFEST = resolve_repo_path(str(config["samples"])).as_posix()
-BUSCO_DOWNLOAD_PATH = resolve_repo_path(str(config["busco_download_path"])).as_posix()
+BUSCO_DOWNLOAD_PATH = resolve_repo_path(str(config.get("busco_download_path", "work/busco_downloads"))).as_posix()
 BUSCO_WORK_ROOT = resolve_repo_path(str(config.get("busco_work_root", "work/busco"))).as_posix()
+BUSCO_LINEAGE = str(config["busco_lineage"])
+OCCUPANCY_THRESHOLD = float(config.get("occupancy_threshold", 0.8))
+IQTREE_EXECUTABLE = str(config.get("iqtree_executable", "iqtree3"))
+WASTRAL_EXECUTABLE = str(config.get("wastral_executable", "wastral"))
+ASTRAL4_EXECUTABLE = str(config.get("astral4_executable", "astral4"))
+IQTREE_MODEL = str(config.get("iqtree_model", "MFP"))
+IQTREE_SUPPORT_MODE = str(config.get("iqtree_support_mode", "abayes"))
+IQTREE_SEED = int(config.get("iqtree_seed", 20260327))
+IQTREE_UFBOOT_REPLICATES = int(config.get("iqtree_ufboot_replicates", 1000))
+IQTREE_SCFL_QUARTETS = int(config.get("iqtree_scfl_quartets", 100))
+IQTREE_SCFL_MODEL = str(config.get("iqtree_scfl_model", "LG+G4"))
 
 VALIDATED_MANIFEST = "results/metadata/samples.validated.tsv"
 TAXON_NAME_MAP = "results/metadata/taxon_name_map.tsv"

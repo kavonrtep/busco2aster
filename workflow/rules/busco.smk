@@ -21,7 +21,7 @@ rule verify_busco_lineage:
     output:
         BUSCO_LINEAGE_VERIFIED,
     params:
-        lineage=config["busco_lineage"],
+        lineage=BUSCO_LINEAGE,
     shell:
         (
             "python3 -m scripts.verify_busco_lineage "
@@ -45,7 +45,7 @@ rule run_busco:
     params:
         sample_dir="results/busco/{sample}",
         raw_root=lambda wildcards: f"{BUSCO_WORK_ROOT}/{wildcards.sample}/raw",
-        lineage=config["busco_lineage"],
+        lineage=BUSCO_LINEAGE,
         download_path=BUSCO_DOWNLOAD_PATH,
     threads:
         get_thread_count("busco")

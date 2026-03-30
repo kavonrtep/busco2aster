@@ -10,7 +10,7 @@ rule infer_gene_concordance:
         log=GCF_OUTPUTS["log"],
         completion=GCF_OUTPUTS["completion"],
     params:
-        executable=config["iqtree_executable"],
+        executable=IQTREE_EXECUTABLE,
         prefix=GCF_OUTPUTS["prefix"],
     threads:
         get_thread_count("concordance")
@@ -47,12 +47,12 @@ rule infer_site_concordance:
         log=SCFL_OUTPUTS["log"],
         completion=SCFL_OUTPUTS["completion"],
     params:
-        executable=config["iqtree_executable"],
+        executable=IQTREE_EXECUTABLE,
         prefix=SCFL_OUTPUTS["prefix"],
         alignment_dir=ALIGNMENT_DIR,
-        quartets=int(config.get("iqtree_scfl_quartets", 100)),
+        quartets=IQTREE_SCFL_QUARTETS,
         seqtype="AA",
-        model=str(config.get("iqtree_scfl_model", "LG+G4")),
+        model=IQTREE_SCFL_MODEL,
     threads:
         get_thread_count("concordance")
     run:
@@ -90,8 +90,8 @@ rule annotate_species_tree_quartets:
         log=WASTRAL_QUARTET_OUTPUTS["log"],
         completion=WASTRAL_QUARTET_OUTPUTS["completion"],
     params:
-        executable=config["wastral_executable"],
-        support_mode=config["iqtree_support_mode"],
+        executable=WASTRAL_EXECUTABLE,
+        support_mode=IQTREE_SUPPORT_MODE,
         annotation_mode=3,
     threads:
         get_thread_count("concordance")
