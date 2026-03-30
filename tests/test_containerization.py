@@ -41,8 +41,100 @@ class ContainerizationUnitTests(unittest.TestCase):
             )
 
         self.assertEqual(resolved_samples, samples_path)
-        self.assertEqual(input_paths["samples"], samples_path)
-        self.assertEqual(input_paths["assembly:sample1"], assembly_path)
+        self.assertEqual(input_paths["samples"].path, samples_path)
+        self.assertEqual(input_paths["assembly:sample1"].path, assembly_path)
+
+    def test_collect_input_paths_strips_trailing_whitespace_from_manifest_paths(self):
+        with TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            config_dir = repo_root / "config"
+            data_dir = repo_root / "data"
+            config_dir.mkdir(parents=True)
+            data_dir.mkdir(parents=True)
+
+            assembly_path = data_dir / "sample1.fa"
+            assembly_path.write_text(">chr1\nACGT\n", encoding="utf-8")
+
+            samples_path = config_dir / "samples.tsv"
+            samples_path.write_text(
+                "sample_id\ttaxon_id\tassembly_fasta\n"
+                "sample1\tTaxon one\tdata/sample1.fa \n",
+                encoding="utf-8",
+            )
+
+            config_path = config_dir / "config.yaml"
+            config_path.write_text("samples: config/samples.tsv\n", encoding="utf-8")
+            config_obj = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+
+            _, input_paths = run_pipeline.collect_input_paths(
+                config_path=config_path,
+                config_obj=config_obj,
+                repo_root=repo_root,
+            )
+
+        self.assertEqual(input_paths["assembly:sample1"].path, assembly_path)
+        self.assertEqual(input_paths["assembly:sample1"].raw_text, "data/sample1.fa ")
+
+    def test_missing_path_diagnosis_reports_missing_mount_root(self):
+        diagnosis = run_pipeline.missing_path_diagnosis(
+            Path("/definitely_missing_mount/example/sample.fa")
+        )
+        self.assertIn("mount root", diagnosis)
+
+    def test_missing_path_diagnosis_reports_missing_file_inside_visible_tree(self):
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            visible_dir = root / "visible"
+            visible_dir.mkdir()
+
+            diagnosis = run_pipeline.missing_path_diagnosis(visible_dir / "missing.fa")
+
+        self.assertIn("visible tree", diagnosis)
+
+    def test_missing_path_diagnosis_reports_whitespace_manifest_value(self):
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            diagnosis = run_pipeline.missing_path_diagnosis(
+                root / "sample.fa",
+                "sample.fa ",
+            )
+
+        self.assertIn("whitespace", diagnosis)
+
+    def test_missing_path_diagnosis_reports_missing_symlink_target_mount(self):
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            link_path = root / "sample.fa"
+            link_path.symlink_to("/mnt/not_mounted/data/sample.fa")
+
+            diagnosis = run_pipeline.missing_path_diagnosis(link_path)
+
+        self.assertIn("symlink target", diagnosis)
+        self.assertIn("/mnt/not_mounted", diagnosis)
+
+    def test_suggested_bind_dir_uses_mount_root_for_non_visible_absolute_tree(self):
+        bind_dir = run_pipeline.suggested_bind_dir(Path("/mnt/not_mounted/example/sample.fa"))
+        self.assertEqual(bind_dir, Path("/mnt/not_mounted"))
+
+    def test_suggested_bind_dir_uses_existing_ancestor_for_wrong_location(self):
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            visible_dir = root / "visible"
+            visible_dir.mkdir()
+
+            bind_dir = run_pipeline.suggested_bind_dir(visible_dir / "missing" / "sample.fa")
+
+        self.assertEqual(bind_dir, visible_dir)
+
+    def test_suggested_bind_dir_uses_symlink_target_mount_root(self):
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            link_path = root / "sample.fa"
+            link_path.symlink_to("/mnt/not_mounted/data/sample.fa")
+
+            bind_dir = run_pipeline.suggested_bind_dir(link_path)
+
+        self.assertEqual(bind_dir, Path("/mnt/not_mounted"))
 
     def test_prepare_runtime_workdir_creates_fallback_symlinks(self):
         with TemporaryDirectory() as tmpdir:

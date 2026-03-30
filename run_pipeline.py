@@ -9,6 +9,7 @@ import os
 import shlex
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
@@ -21,6 +22,12 @@ IQTREE_EXECUTABLE = Path("/opt/tools/iqtree3/current/bin/iqtree3")
 WASTRAL_EXECUTABLE = Path("/opt/tools/aster/current/bin/wastral")
 ASTRAL4_EXECUTABLE = Path("/opt/tools/aster/current/bin/astral4")
 REQUIRED_SAMPLE_COLUMNS = ("sample_id", "taxon_id", "assembly_fasta")
+
+
+@dataclass(frozen=True)
+class InputPathSpec:
+    path: Path
+    raw_text: str | None = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -114,18 +121,119 @@ def collect_input_paths(
     config_path: Path,
     config_obj: dict,
     repo_root: Path,
-) -> tuple[Path, dict[str, Path]]:
-    input_paths: dict[str, Path] = {"config": config_path}
+) -> tuple[Path, dict[str, InputPathSpec]]:
+    input_paths: dict[str, InputPathSpec] = {"config": InputPathSpec(config_path)}
     samples_path = resolve_path(str(config_obj.get("samples", "config/samples.tsv")), repo_root)
-    input_paths["samples"] = samples_path
+    input_paths["samples"] = InputPathSpec(samples_path)
 
     if samples_path.is_file():
         for row in load_samples_manifest(samples_path):
             sample_id = row["sample_id"].strip() or "unknown"
-            assembly_path = resolve_path(row["assembly_fasta"], repo_root)
-            input_paths[f"assembly:{sample_id}"] = assembly_path
+            raw_assembly_path = row["assembly_fasta"]
+            assembly_path = resolve_path(raw_assembly_path.strip(), repo_root)
+            input_paths[f"assembly:{sample_id}"] = InputPathSpec(
+                path=assembly_path,
+                raw_text=raw_assembly_path,
+            )
 
     return samples_path, input_paths
+
+
+def inferred_mount_root(path: Path) -> Path:
+    parts = path.parts
+    if len(parts) >= 3:
+        return Path(parts[0], parts[1], parts[2])
+    if len(parts) >= 2:
+        return Path(parts[0], parts[1])
+    return Path(path.anchor or "/")
+
+
+def nearest_existing_ancestor(path: Path) -> Path | None:
+    current = path
+    while True:
+        if current.exists():
+            return current
+        if current == current.parent:
+            return None
+        current = current.parent
+
+
+def resolved_symlink_target(path: Path) -> Path | None:
+    if not path.is_symlink():
+        return None
+    target = path.readlink()
+    if target.is_absolute():
+        return target
+    return (path.parent / target).resolve(strict=False)
+
+
+def missing_path_diagnosis(path: Path, raw_text: str | None = None) -> str:
+    if raw_text is not None and raw_text != raw_text.strip():
+        return "manifest value contains leading or trailing whitespace"
+
+    symlink_target = resolved_symlink_target(path)
+    if symlink_target is not None:
+        target_mount_root = inferred_mount_root(symlink_target)
+        if not symlink_target.exists():
+            if not target_mount_root.exists():
+                return (
+                    f"symlink target {symlink_target} is not visible inside the container "
+                    f"(missing mount root {target_mount_root})"
+                )
+            return (
+                f"symlink target {symlink_target} is missing or inaccessible inside a visible tree"
+            )
+
+    if not path.is_absolute():
+        return "relative path could not be resolved to an existing file"
+
+    mount_root = inferred_mount_root(path)
+
+    if not mount_root.exists():
+        return f"mount root {mount_root} is not visible inside the container"
+
+    existing_ancestor = nearest_existing_ancestor(path)
+    if existing_ancestor is None:
+        return "path is not accessible inside the container"
+
+    if existing_ancestor == path.parent:
+        return f"path is inside a visible tree, but the file does not exist under {path.parent}"
+
+    return (
+        "path is inside a visible tree, but an intermediate directory is missing under "
+        f"{existing_ancestor}"
+    )
+
+
+def suggested_bind_dir(path: Path) -> Path:
+    if path.exists():
+        return path.parent if path.suffix else path
+
+    symlink_target = resolved_symlink_target(path)
+    if symlink_target is not None:
+        if symlink_target.exists():
+            return symlink_target.parent if symlink_target.suffix else symlink_target
+        target_mount_root = inferred_mount_root(symlink_target)
+        if not target_mount_root.exists():
+            return target_mount_root
+        existing_target_ancestor = nearest_existing_ancestor(symlink_target)
+        if existing_target_ancestor is not None:
+            return (
+                existing_target_ancestor
+                if existing_target_ancestor.is_dir()
+                else existing_target_ancestor.parent
+            )
+
+    if path.is_absolute():
+        mount_root = inferred_mount_root(path)
+        if not mount_root.exists():
+            return mount_root
+
+    existing_ancestor = nearest_existing_ancestor(path)
+    if existing_ancestor is not None:
+        return existing_ancestor if existing_ancestor.is_dir() else existing_ancestor.parent
+
+    return path.parent if path.suffix else path
 
 
 def format_bind_suggestion(
@@ -147,15 +255,16 @@ def format_bind_suggestion(
 
 def show_bind_suggestions(
     *,
-    input_paths: dict[str, Path],
+    input_paths: dict[str, InputPathSpec],
     config_path: Path,
     repo_root: Path,
     workdir: Path,
     threads: int,
 ) -> None:
     bind_dirs = {repo_root, workdir, config_path.parent}
-    for path in input_paths.values():
-        bind_dirs.add(path.parent if path.suffix else path)
+    for spec in input_paths.values():
+        path = spec.path
+        bind_dirs.add(suggested_bind_dir(path))
     ordered_dirs = sorted(path.resolve() for path in bind_dirs)
 
     print("\nSuggested bind mounts:", file=sys.stderr)
@@ -250,18 +359,19 @@ def build_snakemake_command(
 def validate_runtime_inputs(
     *,
     config_path: Path,
-    input_paths: dict[str, Path],
+    input_paths: dict[str, InputPathSpec],
     repo_root: Path,
     workdir: Path,
     threads: int,
 ) -> bool:
-    missing = [(key, path) for key, path in input_paths.items() if not path.exists()]
+    missing = [(key, spec) for key, spec in input_paths.items() if not spec.path.exists()]
     if not missing:
         return True
 
     print("ERROR: Required workflow inputs are not accessible:", file=sys.stderr)
-    for key, path in missing:
-        print(f"  {key}: {path}", file=sys.stderr)
+    for key, spec in missing:
+        print(f"  {key}: {spec.path}", file=sys.stderr)
+        print(f"    diagnosis: {missing_path_diagnosis(spec.path, spec.raw_text)}", file=sys.stderr)
     show_bind_suggestions(
         input_paths=input_paths,
         config_path=config_path,
@@ -285,7 +395,7 @@ def run() -> int:
     if not config_path.is_file():
         print(f"ERROR: Config file not found: {config_path}", file=sys.stderr)
         show_bind_suggestions(
-            input_paths={"config": config_path},
+            input_paths={"config": InputPathSpec(config_path)},
             config_path=config_path,
             repo_root=repo_root,
             workdir=workdir,
