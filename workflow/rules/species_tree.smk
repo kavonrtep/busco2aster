@@ -1,6 +1,6 @@
 rule prepare_wastral_gene_trees:
     input:
-        gene_trees=ancient(GENE_TREE_AGGREGATE),
+        gene_trees=GENE_TREE_AGGREGATE,
     output:
         WASTRAL_GENE_TREE_INPUT,
     params:
@@ -52,7 +52,7 @@ rule infer_species_tree_wastral:
 
 rule infer_species_tree_astral4:
     input:
-        gene_trees=ancient(GENE_TREE_AGGREGATE),
+        gene_trees=GENE_TREE_AGGREGATE,
     output:
         command=ASTRAL4_OUTPUTS["command"],
         treefile=ASTRAL4_OUTPUTS["treefile"],

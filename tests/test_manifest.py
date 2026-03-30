@@ -1,3 +1,4 @@
+import csv
 import subprocess
 import tempfile
 import unittest
@@ -137,6 +138,74 @@ class ManifestWorkflowTests(unittest.TestCase):
         self.assertTrue(taxon_map.is_file())
         self.assertIn("sanitized_taxon_id", validated.read_text(encoding="utf-8").splitlines()[0])
         self.assertIn("sanitized_taxon_id", taxon_map.read_text(encoding="utf-8").splitlines()[0])
+
+    def test_adding_sample_reuses_existing_busco_and_rebuilds_downstream_aggregates(self):
+        source_manifest = REPO_ROOT / "config" / "samples.tsv"
+        with source_manifest.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle, delimiter="\t"))
+
+        self.assertGreaterEqual(len(rows), 1)
+        extra_row = {
+            "sample_id": "solanum_demo_added",
+            "taxon_id": "Solanum demo added",
+            "assembly_fasta": rows[0]["assembly_fasta"],
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            manifest_path = tmp_path / "samples.tsv"
+            config_path = tmp_path / "config.yaml"
+
+            with manifest_path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    delimiter="\t",
+                    fieldnames=["sample_id", "taxon_id", "assembly_fasta"],
+                )
+                writer.writeheader()
+                writer.writerows([*rows, extra_row])
+
+            config_path.write_text(
+                f"samples: {manifest_path.as_posix()}\n"
+                "busco_lineage: solanales_odb12\n"
+                "threads:\n"
+                "  default: 4\n"
+                "  alignment: 1\n"
+                "  busco: 4\n"
+                "  concordance: 4\n"
+                "  iqtree: 4\n"
+                "  species_tree: 4\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    "snakemake",
+                    "-n",
+                    "-p",
+                    "--configfile",
+                    config_path.as_posix(),
+                    "--cores",
+                    "4",
+                    "results/report/report.html",
+                ],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+        self.assertGreaterEqual(result.stdout.count("rule run_busco:"), 1)
+        self.assertIn("wildcards: sample=solanum_demo_added", result.stdout)
+        self.assertIn("rule summarize_busco:", result.stdout)
+        self.assertIn("rule build_locus_matrix:", result.stdout)
+        self.assertIn("checkpoint select_loci:", result.stdout)
+        self.assertIn("rule export_retained_fastas:", result.stdout)
+        self.assertIn("rule infer_gene_trees:", result.stdout)
+        self.assertIn("rule infer_species_tree_wastral:", result.stdout)
+        self.assertIn("rule infer_gene_concordance:", result.stdout)
+        self.assertIn("rule infer_site_concordance:", result.stdout)
+        self.assertIn("rule render_visual_report:", result.stdout)
 
 
 if __name__ == "__main__":

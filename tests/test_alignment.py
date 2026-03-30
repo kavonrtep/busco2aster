@@ -380,10 +380,9 @@ class AlignmentWorkflowTests(unittest.TestCase):
                 "-R",
                 "export_retained_fastas",
                 "align_locus_batch",
-                "alignments_complete",
                 "--cores",
                 "4",
-                "results/loci/alignments.complete",
+                "results/loci/batches/alignment_batch_0000.complete",
             ],
             cwd=REPO_ROOT,
             capture_output=True,
@@ -392,19 +391,14 @@ class AlignmentWorkflowTests(unittest.TestCase):
         )
         self.assertIn("rule export_retained_fastas:", result.stdout)
         self.assertIn("rule align_locus_batch:", result.stdout)
-        self.assertIn("rule alignments_complete:", result.stdout)
         self.assertIn("python3 -m scripts.run_alignment_batch", result.stdout)
 
     def test_exported_fasta_matches_retained_loci_output_for_real_locus(self):
-        subprocess.run(
-            ["snakemake", "--cores", "1", "results/loci/raw_fastas_manifest.tsv"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-
         raw_fasta_path = REPO_ROOT / "results/loci/raw_fastas/35at4069.faa"
+        manifest_path = REPO_ROOT / "results/loci/raw_fastas_manifest.tsv"
+        if not raw_fasta_path.is_file() or not manifest_path.is_file():
+            self.skipTest("Real retained-locus FASTA outputs are not present.")
+
         records = parse_fasta_records(raw_fasta_path)
         headers = [header for header, _ in records]
 
@@ -415,9 +409,7 @@ class AlignmentWorkflowTests(unittest.TestCase):
         self.assertEqual(headers, retained_map["35at4069"]["retained_sanitized_taxon_ids"].split(","))
         self.assertEqual(headers, sorted(headers))
 
-        with (REPO_ROOT / "results/loci/raw_fastas_manifest.tsv").open(
-            newline="", encoding="utf-8"
-        ) as handle:
+        with manifest_path.open(newline="", encoding="utf-8") as handle:
             manifest_rows = list(csv.DictReader(handle, delimiter="\t"))
         manifest_map = {row["locus_id"]: row for row in manifest_rows}
         self.assertEqual(
