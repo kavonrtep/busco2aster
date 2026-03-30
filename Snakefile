@@ -32,6 +32,7 @@ def get_thread_count(name: str) -> int:
 
 WORKFLOW_ROOT = Path(workflow.basedir).resolve()
 REPO_ROOT = Path(str(config.get("repo_root", WORKFLOW_ROOT))).resolve()
+shell.prefix(f"export PYTHONPATH={WORKFLOW_ROOT.as_posix()}:${{{{PYTHONPATH-}}}}; ")
 
 
 def resolve_repo_path(path_text: str) -> Path:

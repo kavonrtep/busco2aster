@@ -27,6 +27,12 @@ class Phase0RepositoryTests(unittest.TestCase):
         module = importlib.import_module("scripts")
         self.assertIsNotNone(module)
 
+    def test_snakefile_exports_repo_root_on_pythonpath_for_shell_rules(self):
+        snakefile_text = (REPO_ROOT / "Snakefile").read_text(encoding="utf-8")
+        self.assertIn("shell.prefix(", snakefile_text)
+        self.assertIn("export PYTHONPATH=", snakefile_text)
+        self.assertIn("${{{{PYTHONPATH-}}}}", snakefile_text)
+
 
 if __name__ == "__main__":
     unittest.main()
