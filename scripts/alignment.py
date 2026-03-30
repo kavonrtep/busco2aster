@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import subprocess
 from pathlib import Path
 
 from .locus_matrix import parse_fasta_records
@@ -27,6 +28,11 @@ def locus_output_paths(locus_id: str) -> dict[str, str]:
     }
 
 
+def alignment_batch_output_paths(batch_id: str) -> dict[str, str]:
+    completion = Path("results") / "loci" / "batches" / f"alignment_batch_{batch_id}.complete"
+    return {"completion": completion.as_posix()}
+
+
 def _resolve_repo_path(repo_root: Path, path_text: str) -> Path:
     path = Path(path_text)
     return path if path.is_absolute() else repo_root / path
@@ -35,6 +41,11 @@ def _resolve_repo_path(repo_root: Path, path_text: str) -> Path:
 def _load_tsv_rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return [dict(row) for row in csv.DictReader(handle, delimiter="\t")]
+
+
+def load_raw_fasta_manifest_rows(path: Path) -> list[dict[str, str]]:
+    rows = _load_tsv_rows(path)
+    return sorted(rows, key=lambda row: busco_sort_key(row["locus_id"]))
 
 
 def load_retained_locus_ids(path: Path) -> list[str]:
@@ -46,6 +57,20 @@ def load_retained_locus_rows(path: Path) -> list[dict[str, str]]:
     rows = _load_tsv_rows(path)
     retained = [row for row in rows if row.get("decision") == "retain"]
     return sorted(retained, key=lambda row: busco_sort_key(row["locus_id"]))
+
+
+def build_batch_ids(locus_ids: list[str], batch_size: int) -> list[str]:
+    if batch_size <= 0:
+        raise ValueError("Batch size must be positive.")
+    batch_count = (len(locus_ids) + batch_size - 1) // batch_size
+    return [f"{index:04d}" for index in range(batch_count)]
+
+
+def _select_batch_rows(rows: list[dict[str, str]], batch_id: str, batch_size: int) -> list[dict[str, str]]:
+    batch_index = int(batch_id)
+    start = batch_index * batch_size
+    end = start + batch_size
+    return rows[start:end]
 
 
 def _build_retained_locus_map(path: Path) -> dict[str, dict[str, str]]:
@@ -177,3 +202,61 @@ def export_retained_fastas(
         manifest_rows,
         ["locus_id", "raw_fasta", "taxon_count"],
     )
+
+
+def run_alignment_batch(
+    manifest_path: Path,
+    output_dir: Path,
+    log_dir: Path,
+    batch_id: str,
+    batch_size: int,
+    threads_per_alignment: int,
+    mafft_executable: str = "mafft",
+) -> None:
+    manifest_rows = load_raw_fasta_manifest_rows(manifest_path)
+    batch_rows = _select_batch_rows(manifest_rows, batch_id, batch_size)
+    if not batch_rows:
+        raise ValueError(f"Batch {batch_id!r} does not contain any alignments.")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    for row in batch_rows:
+        locus_id = row["locus_id"]
+        raw_fasta = Path(row["raw_fasta"])
+        outputs = locus_output_paths(locus_id)
+        alignment_path = Path(outputs["alignment"])
+        log_path = Path(outputs["log"])
+        alignment_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        command = [
+            mafft_executable,
+            "--amino",
+            "--anysymbol",
+            "--auto",
+            "--thread",
+            str(threads_per_alignment),
+            raw_fasta.as_posix(),
+        ]
+        with alignment_path.open("w", encoding="utf-8") as stdout_handle, log_path.open(
+            "w", encoding="utf-8"
+        ) as stderr_handle:
+            subprocess.run(command, check=True, stdout=stdout_handle, stderr=stderr_handle)
+
+
+def sync_alignment_outputs(manifest_path: Path, output_dir: Path, log_dir: Path) -> None:
+    manifest_rows = load_raw_fasta_manifest_rows(manifest_path)
+    expected_alignments = {f"{row['locus_id']}.aln.faa" for row in manifest_rows}
+    expected_logs = {f"{row['locus_id']}.log" for row in manifest_rows}
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    for path in output_dir.glob("*.aln.faa"):
+        if path.name not in expected_alignments:
+            path.unlink()
+
+    for path in log_dir.glob("*.log"):
+        if path.name not in expected_logs:
+            path.unlink()

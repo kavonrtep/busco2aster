@@ -1,6 +1,6 @@
 # busco2aster
 
-`busco2aster` is a Snakemake workflow for building an unrooted species tree from genome assemblies using BUSCO-defined ortholog markers. It is designed to keep the run inspectable: every major stage writes explicit intermediate tables, per-locus files, a machine-readable Markdown audit report, and a visual HTML report.
+`busco2aster` is a Snakemake workflow for building an unrooted species tree from genome assemblies using BUSCO-defined ortholog markers. It is designed to keep the run inspectable: every major stage writes explicit intermediate tables, stable aggregate outputs, a machine-readable Markdown audit report, and a visual HTML report.
 
 ## What the Workflow Does
 
@@ -11,8 +11,8 @@ Given one genome assembly per taxon, the workflow:
 3. parses BUSCO outputs into sample-level and locus-level QC tables
 4. retains loci that meet the v1 filter policy
 5. exports one protein FASTA per retained locus
-6. aligns loci with MAFFT
-7. infers one gene tree per locus with IQ-TREE 3
+6. aligns loci with batched MAFFT jobs
+7. infers gene trees with IQ-TREE 3 directory mode
 8. infers an unrooted species tree with ASTER `wastral`
 9. computes concordance metrics on the final species tree
 10. renders final Markdown and HTML reports
@@ -54,6 +54,13 @@ Native mode uses rule-specific Conda environments for BUSCO, MAFFT, and the
 Quarto/R report step. IQ-TREE 3 and ASTER can be installed locally into
 `work/tools/`. The container image bakes Snakemake, IQ-TREE 3, ASTER, Quarto,
 and the rule Conda environments into a single `.sif` image.
+
+Current optimization-related behavior:
+
+- BUSCO raw scratch is written under `work/busco/`
+- stable BUSCO sequence files are copied into `results/busco/*/busco_sequences/`
+- alignments run in batches to reduce scheduler overhead
+- gene trees use one IQ-TREE directory-mode run instead of one workflow job per locus
 
 ## Input Format
 
@@ -105,6 +112,14 @@ For a dry-run:
 snakemake -n -p --cores 4 results/report/report.html
 ```
 
+Optional cleanup after a finished run:
+
+```bash
+python3 -m scripts.cleanup_outputs --mode resume_alignments --dry-run
+python3 -m scripts.cleanup_outputs --mode resume_gene_trees --dry-run
+python3 -m scripts.cleanup_outputs --mode final_report --dry-run
+```
+
 ### Container Mode
 
 Build the image locally:
@@ -145,6 +160,7 @@ Key outputs are:
 - `results/qc/locus_taxon_matrix.tsv`
 - `results/qc/retained_loci.tsv`
 - `results/loci/alignments/`
+- `results/busco/*/busco_sequences/`
 - `results/gene_trees/gene_tree_manifest.tsv`
 - `results/gene_trees/gene_trees.raw.tre`
 - `results/species_tree/species_tree.wastral.tre`
@@ -160,10 +176,13 @@ Useful validation commands:
 
 ```bash
 snakemake -n
+snakemake -n -p --cores 4 results/loci/alignments.complete
+snakemake -n -p --cores 4 results/gene_trees/gene_trees.raw.tre
 snakemake -s workflow/Snakefile_create_envs -n
 python3 run_pipeline.py --config config/config.yaml --repo-root . --directory . --target results/metadata/samples.validated.tsv --snakemake-args="--dry-run"
+python3 -m scripts.cleanup_outputs --mode final_report --dry-run
 python3 -m unittest discover -s tests -v
 git status --short
 ```
 
-Design notes live in [docs/problem_formulation.md](/home/petr/PycharmProjects/get_phylo/docs/problem_formulation.md), [docs/implementation_consolidated.md](/home/petr/PycharmProjects/get_phylo/docs/implementation_consolidated.md), [docs/implementation_phases.md](/home/petr/PycharmProjects/get_phylo/docs/implementation_phases.md), [docs/containerization_plan.md](/home/petr/PycharmProjects/get_phylo/docs/containerization_plan.md), and [docs/visual_report_plan.md](/home/petr/PycharmProjects/get_phylo/docs/visual_report_plan.md).
+Design notes live in [docs/problem_formulation.md](/home/petr/PycharmProjects/get_phylo/docs/problem_formulation.md), [docs/implementation_consolidated.md](/home/petr/PycharmProjects/get_phylo/docs/implementation_consolidated.md), [docs/implementation_phases.md](/home/petr/PycharmProjects/get_phylo/docs/implementation_phases.md), [docs/containerization_plan.md](/home/petr/PycharmProjects/get_phylo/docs/containerization_plan.md), [docs/visual_report_plan.md](/home/petr/PycharmProjects/get_phylo/docs/visual_report_plan.md), [docs/optimization_review.md](/home/petr/PycharmProjects/get_phylo/docs/optimization_review.md), [docs/optimization_plan.md](/home/petr/PycharmProjects/get_phylo/docs/optimization_plan.md), and [docs/iqtree_directory_mode_evaluation.md](/home/petr/PycharmProjects/get_phylo/docs/iqtree_directory_mode_evaluation.md).

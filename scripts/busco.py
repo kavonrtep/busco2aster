@@ -152,9 +152,14 @@ def load_validated_manifest_rows(path: Path) -> list[dict[str, str]]:
 
 def busco_output_paths(sample_id: str) -> dict[str, str]:
     sample_root = Path("results") / "busco" / sample_id
+    sequence_root = sample_root / "busco_sequences"
     return {
         "sample_root": sample_root.as_posix(),
-        "raw_root": (sample_root / "raw").as_posix(),
+        "raw_root": (Path("work") / "busco" / sample_id / "raw").as_posix(),
+        "sequence_root": sequence_root.as_posix(),
+        "single_copy_sequence_dir": (sequence_root / "single_copy_busco_sequences").as_posix(),
+        "multi_copy_sequence_dir": (sequence_root / "multi_copy_busco_sequences").as_posix(),
+        "fragmented_sequence_dir": (sequence_root / "fragmented_busco_sequences").as_posix(),
         "command": (sample_root / "command.sh").as_posix(),
         "paths": (sample_root / "paths.tsv").as_posix(),
         "short_summary": (sample_root / "short_summary.txt").as_posix(),
@@ -420,6 +425,20 @@ def _find_optional_dir(base_dir: Path, name: str) -> str:
     return matches[0].as_posix() if matches else ""
 
 
+def _copy_optional_dir(source_root: Path, artifact_name: str, destination_root: Path) -> str:
+    source_dir_text = _find_optional_dir(source_root, artifact_name)
+    if not source_dir_text:
+        return ""
+
+    source_dir = Path(source_dir_text)
+    destination_dir = destination_root / artifact_name
+    if destination_dir.exists():
+        shutil.rmtree(destination_dir)
+    destination_dir.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source_dir, destination_dir)
+    return destination_dir.as_posix()
+
+
 def standardize_busco_run(sample_id: str, sample_dir: Path, raw_root: Path) -> None:
     short_summary_source = _find_single_path(raw_root, "short_summary*")
     full_table_source = _find_single_path(raw_root, "full_table.tsv")
@@ -429,10 +448,18 @@ def standardize_busco_run(sample_id: str, sample_dir: Path, raw_root: Path) -> N
     full_table_target = Path(stable_paths["full_table"])
     paths_target = Path(stable_paths["paths"])
     completion_target = Path(stable_paths["completion"])
+    sequence_root = Path(stable_paths["sequence_root"])
 
     short_summary_target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(short_summary_source, short_summary_target)
     shutil.copy2(full_table_source, full_table_target)
+    if sequence_root.exists():
+        shutil.rmtree(sequence_root)
+    sequence_root.mkdir(parents=True, exist_ok=True)
+
+    single_copy_target = _copy_optional_dir(raw_root, "single_copy_busco_sequences", sequence_root)
+    multi_copy_target = _copy_optional_dir(raw_root, "multi_copy_busco_sequences", sequence_root)
+    fragmented_target = _copy_optional_dir(raw_root, "fragmented_busco_sequences", sequence_root)
 
     write_tsv(
         paths_target,
@@ -442,15 +469,15 @@ def standardize_busco_run(sample_id: str, sample_dir: Path, raw_root: Path) -> N
             {"artifact": "full_table_source", "path": full_table_source.as_posix()},
             {
                 "artifact": "single_copy_busco_sequences",
-                "path": _find_optional_dir(raw_root, "single_copy_busco_sequences"),
+                "path": single_copy_target,
             },
             {
                 "artifact": "multi_copy_busco_sequences",
-                "path": _find_optional_dir(raw_root, "multi_copy_busco_sequences"),
+                "path": multi_copy_target,
             },
             {
                 "artifact": "fragmented_busco_sequences",
-                "path": _find_optional_dir(raw_root, "fragmented_busco_sequences"),
+                "path": fragmented_target,
             },
         ],
         ["artifact", "path"],

@@ -20,22 +20,28 @@ rule export_retained_fastas:
         )
 
 
-rule align_locus:
+rule align_locus_batch:
     input:
+        manifest=RAW_FASTA_MANIFEST,
         export_complete=ancient(rules.export_retained_fastas.output.completion),
     output:
-        alignment="results/loci/alignments/{locus_id}.aln.faa",
-    log:
-        "results/loci/logs/mafft/{locus_id}.log",
+        completion="results/loci/batches/alignment_batch_{batch_id}.complete",
     params:
-        raw_fasta=lambda wildcards: f"{RAW_FASTA_DIR}/{wildcards.locus_id}.faa",
+        output_dir=ALIGNMENT_DIR,
+        log_dir="results/loci/logs/mafft",
+        batch_size=int(config.get("alignment_batch_size", 200)),
     threads:
         get_thread_count("alignment")
     conda:
         "../envs/alignment.yaml"
     shell:
-        r"""
-        mkdir -p "$(dirname {output.alignment})"
-        mkdir -p "$(dirname {log})"
-        mafft --amino --anysymbol --auto --thread {threads} {params.raw_fasta:q} > {output.alignment:q} 2> {log:q}
-        """
+        (
+            "python3 -m scripts.run_alignment_batch "
+            "--manifest {input.manifest:q} "
+            "--output-dir {params.output_dir:q} "
+            "--log-dir {params.log_dir:q} "
+            "--batch-id {wildcards.batch_id:q} "
+            "--batch-size {params.batch_size} "
+            "--threads-per-alignment {threads} "
+            "&& touch {output.completion:q}"
+        )

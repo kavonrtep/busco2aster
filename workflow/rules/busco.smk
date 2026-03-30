@@ -44,7 +44,7 @@ rule run_busco:
         completion="results/busco/{sample}/run.complete",
     params:
         sample_dir="results/busco/{sample}",
-        raw_root="results/busco/{sample}/raw",
+        raw_root=lambda wildcards: f"{BUSCO_WORK_ROOT}/{wildcards.sample}/raw",
         lineage=config["busco_lineage"],
         download_path=BUSCO_DOWNLOAD_PATH,
     threads:

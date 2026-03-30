@@ -5,10 +5,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from scripts.alignment import (
+    alignment_batch_output_paths,
+    build_batch_ids,
     export_locus_fasta,
     export_retained_fastas,
     load_retained_locus_ids,
     locus_output_paths,
+    sync_alignment_outputs,
 )
 from scripts.locus_matrix import parse_fasta_records
 from scripts.manifest import write_tsv
@@ -306,6 +309,39 @@ class AlignmentUnitTests(unittest.TestCase):
         self.assertEqual(paths["raw_fasta"], "results/loci/raw_fastas/35at4069.faa")
         self.assertEqual(paths["alignment"], "results/loci/alignments/35at4069.aln.faa")
 
+    def test_alignment_batch_helpers_are_deterministic(self):
+        self.assertEqual(build_batch_ids(["1at1", "2at1", "3at1", "4at1", "5at1"], 2), ["0000", "0001", "0002"])
+        self.assertEqual(
+            alignment_batch_output_paths("0003")["completion"],
+            "results/loci/batches/alignment_batch_0003.complete",
+        )
+
+    def test_sync_alignment_outputs_removes_stale_alignments_and_logs(self):
+        with TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            manifest_path = tmp_path / "raw_fastas_manifest.tsv"
+            alignment_dir = tmp_path / "alignments"
+            log_dir = tmp_path / "logs"
+            alignment_dir.mkdir()
+            log_dir.mkdir()
+
+            write_tsv(
+                manifest_path,
+                [{"locus_id": "locus_keep", "raw_fasta": "raw/locus_keep.faa", "taxon_count": "2"}],
+                ["locus_id", "raw_fasta", "taxon_count"],
+            )
+            (alignment_dir / "locus_keep.aln.faa").write_text(">a\nM\n", encoding="utf-8")
+            (alignment_dir / "stale.aln.faa").write_text(">a\nM\n", encoding="utf-8")
+            (log_dir / "locus_keep.log").write_text("ok\n", encoding="utf-8")
+            (log_dir / "stale.log").write_text("stale\n", encoding="utf-8")
+
+            sync_alignment_outputs(manifest_path, alignment_dir, log_dir)
+
+            self.assertTrue((alignment_dir / "locus_keep.aln.faa").is_file())
+            self.assertFalse((alignment_dir / "stale.aln.faa").exists())
+            self.assertTrue((log_dir / "locus_keep.log").is_file())
+            self.assertFalse((log_dir / "stale.log").exists())
+
 
 class AlignmentSmokeTests(unittest.TestCase):
     def test_mafft_smoke_alignment_preserves_internal_stop_with_anysymbol(self):
@@ -335,7 +371,7 @@ class AlignmentSmokeTests(unittest.TestCase):
 
 
 class AlignmentWorkflowTests(unittest.TestCase):
-    def test_alignment_rule_dry_run_renders_for_real_locus(self):
+    def test_alignment_rule_dry_run_renders_batched_execution(self):
         result = subprocess.run(
             [
                 "snakemake",
@@ -343,10 +379,11 @@ class AlignmentWorkflowTests(unittest.TestCase):
                 "-p",
                 "-R",
                 "export_retained_fastas",
-                "align_locus",
+                "align_locus_batch",
+                "alignments_complete",
                 "--cores",
                 "4",
-                "results/loci/alignments/35at4069.aln.faa",
+                "results/loci/alignments.complete",
             ],
             cwd=REPO_ROOT,
             capture_output=True,
@@ -354,8 +391,9 @@ class AlignmentWorkflowTests(unittest.TestCase):
             check=True,
         )
         self.assertIn("rule export_retained_fastas:", result.stdout)
-        self.assertIn("rule align_locus:", result.stdout)
-        self.assertIn("mafft --amino --anysymbol --auto --thread 1", result.stdout)
+        self.assertIn("rule align_locus_batch:", result.stdout)
+        self.assertIn("rule alignments_complete:", result.stdout)
+        self.assertIn("python3 -m scripts.run_alignment_batch", result.stdout)
 
     def test_exported_fasta_matches_retained_loci_output_for_real_locus(self):
         subprocess.run(

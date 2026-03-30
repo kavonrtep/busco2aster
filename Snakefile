@@ -3,18 +3,18 @@ Snakemake entrypoint for the full busco2aster workflow.
 
 This file currently exposes manifest validation, BUSCO tool preflight,
 per-sample BUSCO execution, BUSCO QC summarization, locus selection,
-batched retained-locus FASTA export, alignment, per-locus gene trees,
-ASTER species-tree inference, IQ-TREE gCF concordance scoring, and final
-report generation.
+batched retained-locus FASTA export, batched alignment, directory-mode
+IQ-TREE gene trees, ASTER species-tree inference, IQ-TREE gCF concordance
+scoring, and final report generation.
 """
 
 import csv
 from pathlib import Path
 
-from scripts.alignment import load_retained_locus_ids, locus_output_paths
+from scripts.alignment import alignment_batch_output_paths, build_batch_ids, load_retained_locus_ids
 from scripts.busco import busco_output_paths
 from scripts.concordance import concordance_output_paths, quartet_output_paths
-from scripts.gene_trees import gene_tree_output_paths
+from scripts.gene_trees import gene_tree_directory_output_paths
 from scripts.species_tree import species_tree_output_paths
 
 configfile: "config/config.yaml"
@@ -41,6 +41,7 @@ def resolve_repo_path(path_text: str) -> Path:
 
 SAMPLES_MANIFEST = resolve_repo_path(str(config["samples"])).as_posix()
 BUSCO_DOWNLOAD_PATH = resolve_repo_path(str(config["busco_download_path"])).as_posix()
+BUSCO_WORK_ROOT = resolve_repo_path(str(config.get("busco_work_root", "work/busco"))).as_posix()
 
 VALIDATED_MANIFEST = "results/metadata/samples.validated.tsv"
 TAXON_NAME_MAP = "results/metadata/taxon_name_map.tsv"
@@ -55,9 +56,9 @@ RAW_FASTA_DIR = "results/loci/raw_fastas"
 RAW_FASTA_MANIFEST = "results/loci/raw_fastas_manifest.tsv"
 ALIGNMENT_DIR = "results/loci/alignments"
 ALIGNMENTS_COMPLETE = "results/loci/alignments.complete"
-GENE_TREE_DIR = "results/gene_trees/per_locus"
 GENE_TREE_MANIFEST = "results/gene_trees/gene_tree_manifest.tsv"
 GENE_TREE_AGGREGATE = "results/gene_trees/gene_trees.raw.tre"
+GENE_TREE_DIRECTORY_OUTPUTS = gene_tree_directory_output_paths()
 WASTRAL_GENE_TREE_INPUT = "results/gene_trees/gene_trees.wastral.tre"
 GENE_TREES_COMPLETE = "results/gene_trees/gene_trees.complete"
 SPECIES_TREE_DIR = "results/species_tree"
@@ -94,20 +95,15 @@ BUSCO_SUMMARY_INPUTS = [
     for sample in SAMPLES
     for artifact in ("completion", "short_summary", "full_table", "paths")
 ]
+ALIGNMENT_BATCH_SIZE = int(config.get("alignment_batch_size", 200))
 
 def retained_locus_ids() -> list[str]:
     retained_output = checkpoints.select_loci.get().output[0]
     return load_retained_locus_ids(Path(retained_output))
 
-def retained_alignment_targets(wildcards):
-    return [locus_output_paths(locus_id)["alignment"] for locus_id in retained_locus_ids()]
-
-def retained_gene_tree_reports(wildcards):
-    return [gene_tree_output_paths(locus_id)["report"] for locus_id in retained_locus_ids()]
-
-
-def retained_gene_tree_treefiles(wildcards):
-    return [gene_tree_output_paths(locus_id)["treefile"] for locus_id in retained_locus_ids()]
+def alignment_batch_markers(wildcards):
+    batch_ids = build_batch_ids(retained_locus_ids(), ALIGNMENT_BATCH_SIZE)
+    return [alignment_batch_output_paths(batch_id)["completion"] for batch_id in batch_ids]
 
 include: "workflow/rules/manifest.smk"
 include: "workflow/rules/busco.smk"
@@ -125,17 +121,26 @@ localrules: all
 
 rule alignments_complete:
     input:
-        [
-            BUSCO_SUMMARY_TABLE,
-            BUSCO_RECORDS_TABLE,
-            LOCUS_TAXON_MATRIX,
-            RETAINED_LOCI_TABLE,
-            RAW_FASTA_MANIFEST,
-            "results/loci/raw_fastas.complete",
-            retained_alignment_targets,
-        ]
+        summary=BUSCO_SUMMARY_TABLE,
+        records=BUSCO_RECORDS_TABLE,
+        matrix=LOCUS_TAXON_MATRIX,
+        retained=RETAINED_LOCI_TABLE,
+        manifest=RAW_FASTA_MANIFEST,
+        raw_fastas_complete="results/loci/raw_fastas.complete",
+        batch_markers=alignment_batch_markers,
     output:
-        touch(ALIGNMENTS_COMPLETE)
+        ALIGNMENTS_COMPLETE
+    params:
+        alignment_dir=ALIGNMENT_DIR,
+        log_dir="results/loci/logs/mafft",
+    shell:
+        (
+            "python3 -m scripts.finalize_alignments "
+            "--manifest {input.manifest:q} "
+            "--output-dir {params.alignment_dir:q} "
+            "--log-dir {params.log_dir:q} "
+            "&& touch {output:q}"
+        )
 
 rule gene_trees_complete:
     input:
@@ -143,7 +148,8 @@ rule gene_trees_complete:
             ALIGNMENTS_COMPLETE,
             GENE_TREE_MANIFEST,
             GENE_TREE_AGGREGATE,
-            retained_gene_tree_treefiles,
+            GENE_TREE_DIRECTORY_OUTPUTS["report"],
+            GENE_TREE_DIRECTORY_OUTPUTS["treefile"],
         ]
     output:
         touch(GENE_TREES_COMPLETE)
@@ -173,7 +179,7 @@ rule all:
             LOCUS_TAXON_MATRIX,
             RETAINED_LOCI_TABLE,
             RAW_FASTA_MANIFEST,
-            retained_alignment_targets,
+            ALIGNMENTS_COMPLETE,
             GENE_TREE_MANIFEST,
             GENE_TREE_AGGREGATE,
             GENE_TREES_COMPLETE,

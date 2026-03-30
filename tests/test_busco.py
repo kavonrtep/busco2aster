@@ -49,6 +49,11 @@ class BuscoUnitTests(unittest.TestCase):
     def test_busco_output_paths_are_derived_from_sample_id(self):
         paths = busco_output_paths("solanum_chilense")
         self.assertEqual(paths["sample_root"], "results/busco/solanum_chilense")
+        self.assertEqual(paths["raw_root"], "work/busco/solanum_chilense/raw")
+        self.assertEqual(
+            paths["single_copy_sequence_dir"],
+            "results/busco/solanum_chilense/busco_sequences/single_copy_busco_sequences",
+        )
         self.assertEqual(paths["completion"], "results/busco/solanum_chilense/run.complete")
         self.assertEqual(paths["short_summary"], "results/busco/solanum_chilense/short_summary.txt")
 

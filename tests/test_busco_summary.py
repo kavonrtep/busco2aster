@@ -84,7 +84,7 @@ def write_fixture_busco_run(repo_root: Path, sample_id: str, taxon_id: str) -> N
     paths_tsv_path = repo_root / stable_paths["paths"]
     completion_path = repo_root / stable_paths["completion"]
 
-    sequence_root = raw_root / sample_id / "run_solanales_odb12" / "busco_sequences"
+    sequence_root = repo_root / stable_paths["sequence_root"]
     single_copy_dir = sequence_root / "single_copy_busco_sequences"
     multi_copy_dir = sequence_root / "multi_copy_busco_sequences"
     fragmented_dir = sequence_root / "fragmented_busco_sequences"
@@ -121,15 +121,15 @@ def write_fixture_busco_run(repo_root: Path, sample_id: str, taxon_id: str) -> N
             {"artifact": "full_table_source", "path": stable_paths["full_table"]},
             {
                 "artifact": "single_copy_busco_sequences",
-                "path": single_copy_dir.relative_to(repo_root).as_posix(),
+                "path": stable_paths["single_copy_sequence_dir"],
             },
             {
                 "artifact": "multi_copy_busco_sequences",
-                "path": multi_copy_dir.relative_to(repo_root).as_posix(),
+                "path": stable_paths["multi_copy_sequence_dir"],
             },
             {
                 "artifact": "fragmented_busco_sequences",
-                "path": fragmented_dir.relative_to(repo_root).as_posix(),
+                "path": stable_paths["fragmented_sequence_dir"],
             },
         ],
         ["artifact", "path"],

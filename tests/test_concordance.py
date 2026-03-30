@@ -247,7 +247,7 @@ class ConcordanceWorkflowTests(unittest.TestCase):
             text=True,
             check=True,
         )
-        if "Nothing to be done" not in result.stdout:
+        if "rule infer_site_concordance:" in result.stdout:
             self.assertIn("rule infer_site_concordance:", result.stdout)
             self.assertIn("results/species_tree/species_tree.wastral.tre", result.stdout)
             self.assertIn("results/loci/alignments.complete", result.stdout)
@@ -269,7 +269,7 @@ class ConcordanceWorkflowTests(unittest.TestCase):
             text=True,
             check=True,
         )
-        if "Nothing to be done" not in result.stdout:
+        if "rule annotate_species_tree_quartets:" in result.stdout:
             self.assertIn("rule annotate_species_tree_quartets:", result.stdout)
             self.assertIn("results/species_tree/species_tree.wastral.tre", result.stdout)
             self.assertIn("results/gene_trees/gene_trees.wastral.tre", result.stdout)

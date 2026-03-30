@@ -1,11 +1,14 @@
 samples: config/samples.tsv
 results_dir: results
 metadata_dir: results/metadata
+work_dir: work
+busco_work_root: work/busco
 busco_lineage: solanales_odb12
 busco_download_path: work/busco_downloads
 occupancy_threshold: 0.8
 sequence_type: protein
 alignment_tool: mafft
+alignment_batch_size: 200
 trimming_mode: none
 gene_tree_tool: iqtree3
 species_tree_backend: wastral
@@ -23,5 +26,5 @@ threads:
   alignment: 1
   busco: 4
   concordance: 4
-  iqtree: 1
+  iqtree: 4
   species_tree: 4
