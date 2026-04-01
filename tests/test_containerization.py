@@ -12,6 +12,41 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class ContainerizationUnitTests(unittest.TestCase):
+    def test_compute_thread_overrides_uses_auto_policy(self):
+        overrides = run_pipeline.compute_thread_overrides(
+            total_cores=40,
+            sample_count=25,
+            config_obj={},
+            snakemake_args="",
+        )
+
+        self.assertEqual(overrides["prepare_assembly"], 10)
+        self.assertEqual(overrides["run_busco"], 10)
+        self.assertEqual(overrides["align_locus_batch"], 1)
+        self.assertEqual(overrides["infer_gene_trees"], 40)
+        self.assertEqual(overrides["infer_gene_concordance"], 40)
+        self.assertEqual(overrides["infer_site_concordance"], 40)
+        self.assertEqual(overrides["annotate_species_tree_quartets"], 40)
+        self.assertEqual(overrides["infer_species_tree_wastral"], 40)
+
+    def test_compute_thread_overrides_respects_fixed_policy(self):
+        overrides = run_pipeline.compute_thread_overrides(
+            total_cores=40,
+            sample_count=25,
+            config_obj={"thread_policy": "fixed"},
+            snakemake_args="",
+        )
+        self.assertEqual(overrides, {})
+
+    def test_compute_thread_overrides_skips_auto_when_set_threads_is_explicit(self):
+        overrides = run_pipeline.compute_thread_overrides(
+            total_cores=40,
+            sample_count=25,
+            config_obj={},
+            snakemake_args="--set-threads infer_gene_trees=12",
+        )
+        self.assertEqual(overrides, {})
+
     def test_collect_input_paths_resolves_manifest_and_assemblies_from_repo_root(self):
         with TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir)
@@ -158,10 +193,13 @@ class ContainerizationUnitTests(unittest.TestCase):
             threads=4,
             target=None,
             snakemake_args="--dry-run",
+            thread_overrides={"infer_gene_trees": 4},
         )
 
         self.assertIn("all", command)
         self.assertNotIn("results/report/report.html", command)
+        self.assertIn("--set-threads", command)
+        self.assertIn("infer_gene_trees=4", command)
 
 
 class ContainerizationWorkflowTests(unittest.TestCase):

@@ -160,6 +160,9 @@ The same command works with `singularity run`. The wrapper:
 - validates that the config, manifest, and assembly paths are visible
 - prints suggested `-B` bind mounts if anything is missing
 - injects container-internal paths for IQ-TREE 3 and ASTER
+- defaults to the workflow `all` target if `--target` is omitted
+- uses all visible CPUs by default if `-t/--threads` is omitted
+- auto-scales per-rule thread settings from the global core budget unless `thread_policy: fixed`
 - runs Snakemake with `/opt/conda/envs` as the shared Conda prefix
 
 Important runtime rule:

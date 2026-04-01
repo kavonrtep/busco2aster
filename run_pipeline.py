@@ -22,6 +22,20 @@ IQTREE_EXECUTABLE = Path("/opt/tools/iqtree3/current/bin/iqtree3")
 WASTRAL_EXECUTABLE = Path("/opt/tools/aster/current/bin/wastral")
 ASTRAL4_EXECUTABLE = Path("/opt/tools/aster/current/bin/astral4")
 REQUIRED_SAMPLE_COLUMNS = ("sample_id", "taxon_id", "assembly_fasta")
+DEFAULT_THREAD_POLICY = "auto"
+SINGLE_JOB_RULES = (
+    "infer_gene_trees",
+    "infer_gene_concordance",
+    "infer_site_concordance",
+    "annotate_species_tree_quartets",
+    "infer_species_tree_wastral",
+    "infer_species_tree_astral4",
+)
+SHARED_SAMPLE_RULES = ("prepare_assembly", "run_busco")
+
+
+def _default_thread_budget() -> int:
+    return max(1, os.cpu_count() or 1)
 
 
 @dataclass(frozen=True)
@@ -42,8 +56,8 @@ def parse_args() -> argparse.Namespace:
         "-t",
         "--threads",
         type=int,
-        default=4,
-        help="Maximum Snakemake core count.",
+        default=_default_thread_budget(),
+        help="Maximum Snakemake core count. Defaults to all visible CPUs.",
     )
     parser.add_argument(
         "--target",
@@ -302,6 +316,44 @@ def prepare_runtime_workdir(workdir: Path, pipeline_dir: Path) -> None:
         destination.symlink_to(source.resolve(), target_is_directory=True)
 
 
+def _snakemake_args_contain_set_threads(snakemake_args: str) -> bool:
+    return "--set-threads" in shlex.split(snakemake_args)
+
+
+def compute_thread_overrides(
+    *,
+    total_cores: int,
+    sample_count: int,
+    config_obj: dict,
+    snakemake_args: str,
+) -> dict[str, int]:
+    if total_cores < 1:
+        raise ValueError("total_cores must be at least 1")
+
+    thread_policy = str(config_obj.get("thread_policy", DEFAULT_THREAD_POLICY)).strip().lower()
+    if thread_policy == "fixed":
+        return {}
+    if thread_policy != "auto":
+        raise ValueError(
+            f"Unsupported thread_policy {thread_policy!r}; expected 'auto' or 'fixed'."
+        )
+    if _snakemake_args_contain_set_threads(snakemake_args):
+        return {}
+
+    if sample_count > 0:
+        concurrent_sample_jobs = min(sample_count, max(1, min(total_cores, 4)))
+    else:
+        concurrent_sample_jobs = 1
+    shared_sample_threads = max(1, total_cores // concurrent_sample_jobs)
+
+    overrides = {"align_locus_batch": 1}
+    for rule_name in SHARED_SAMPLE_RULES:
+        overrides[rule_name] = shared_sample_threads
+    for rule_name in SINGLE_JOB_RULES:
+        overrides[rule_name] = total_cores
+    return overrides
+
+
 def build_snakemake_command(
     *,
     config_path: Path,
@@ -310,6 +362,7 @@ def build_snakemake_command(
     threads: int,
     target: str | None,
     snakemake_args: str,
+    thread_overrides: dict[str, int] | None = None,
 ) -> list[str]:
     command = [
         "snakemake",
@@ -332,6 +385,13 @@ def build_snakemake_command(
         command.extend(["--conda-prefix", CONDA_ENVS_PATH.as_posix()])
 
     command.append(target or "all")
+
+    if thread_overrides:
+        command.append("--set-threads")
+        command.extend(
+            f"{rule_name}={thread_value}"
+            for rule_name, thread_value in sorted(thread_overrides.items())
+        )
 
     command.extend(
         [
@@ -421,6 +481,13 @@ def run() -> int:
     prepare_runtime_workdir(workdir, _pipeline_dir())
     cache_dir = workdir / ".cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
+    sample_count = sum(1 for key in input_paths if key.startswith("assembly:"))
+    thread_overrides = compute_thread_overrides(
+        total_cores=args.threads,
+        sample_count=sample_count,
+        config_obj=config_obj,
+        snakemake_args=args.snakemake_args,
+    )
 
     command = build_snakemake_command(
         config_path=config_path,
@@ -429,6 +496,7 @@ def run() -> int:
         threads=args.threads,
         target=args.target,
         snakemake_args=args.snakemake_args,
+        thread_overrides=thread_overrides,
     )
     print("Running:", " ".join(shlex.quote(token) for token in command))
 

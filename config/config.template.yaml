@@ -10,6 +10,7 @@ assembly_wrap_width: 80
 busco_download_path: work/busco_downloads
 occupancy_threshold: 0.8
 species_tree_backend: wastral
+thread_policy: auto
 iqtree_model: MFP
 iqtree_support_mode: abayes
 iqtree_seed: 20260327
@@ -25,6 +26,11 @@ threads:
   concordance: 4
   iqtree: 4
   species_tree: 4
+
+# Wrapper behavior:
+# - thread_policy: auto (default) makes run_pipeline.py derive per-rule thread
+#   settings from -t/--threads
+# - thread_policy: fixed keeps the values above as-is
 
 # Optional local overrides when tools are not on PATH.
 # iqtree_executable: /absolute/path/to/iqtree3
