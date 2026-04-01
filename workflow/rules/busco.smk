@@ -33,7 +33,7 @@ rule verify_busco_lineage:
 
 rule run_busco:
     input:
-        assembly=lambda wildcards: SAMPLE_TO_ASSEMBLY[wildcards.sample],
+        assembly=ASSEMBLY_PREPARED_PATTERN,
         validated=ancient(VALIDATED_MANIFEST),
         lineage=ancient(BUSCO_LINEAGE_VERIFIED),
     output:

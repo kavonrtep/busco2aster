@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--target",
-        help="Optional Snakemake target file or rule.",
+        help="Optional Snakemake target file or rule. Defaults to the workflow 'all' target.",
     )
     parser.add_argument(
         "--directory",
@@ -294,7 +294,7 @@ def show_bind_suggestions(
 
 def prepare_runtime_workdir(workdir: Path, pipeline_dir: Path) -> None:
     workdir.mkdir(parents=True, exist_ok=True)
-    for name in ("config", "scripts"):
+    for name in ("config", "scripts", "reports"):
         destination = workdir / name
         source = pipeline_dir / name
         if destination.exists() or destination.is_symlink():
@@ -331,8 +331,7 @@ def build_snakemake_command(
     if _is_container():
         command.extend(["--conda-prefix", CONDA_ENVS_PATH.as_posix()])
 
-    if target:
-        command.append(target)
+    command.append(target or "all")
 
     command.extend(
         [

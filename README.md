@@ -7,15 +7,16 @@
 Given one genome assembly per taxon, the workflow:
 
 1. validates a normalized sample manifest
-2. runs BUSCO in genome mode with one shared lineage
-3. parses BUSCO outputs into sample-level and locus-level QC tables
-4. retains loci that meet the v1 filter policy
-5. exports one protein FASTA per retained locus
-6. aligns loci with batched MAFFT jobs
-7. infers gene trees with IQ-TREE 3 directory mode
-8. infers an unrooted species tree with ASTER `wastral`
-9. computes concordance metrics on the final species tree
-10. renders final Markdown and HTML reports
+2. normalizes each assembly into a wrapped gzipped cache for BUSCO
+3. runs BUSCO in genome mode with one shared lineage
+4. parses BUSCO outputs into sample-level and locus-level QC tables
+5. retains loci that meet the v1 filter policy
+6. exports one protein FASTA per retained locus
+7. aligns loci with batched MAFFT jobs
+8. infers gene trees with IQ-TREE 3 directory mode
+9. infers an unrooted species tree with ASTER `wastral`
+10. computes concordance metrics on the final species tree
+11. renders final Markdown and HTML reports
 
 Current v1 defaults in [config/config.yaml](/home/petr/PycharmProjects/get_phylo/config/config.yaml):
 
@@ -64,6 +65,7 @@ container-internal tool paths automatically.
 
 Current optimization-related behavior:
 
+- assembly FASTA files are rewritten with `seqkit` into wrapped cached `.fa.gz` files before BUSCO
 - BUSCO raw scratch is written under `work/busco/`
 - stable BUSCO sequence files are copied into `results/busco/*/busco_sequences/`
 - alignments run in batches to reduce scheduler overhead

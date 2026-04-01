@@ -76,8 +76,10 @@ class BuscoWorkflowTests(unittest.TestCase):
             text=True,
             check=True,
         )
+        self.assertIn("rule prepare_assembly:", result.stdout)
         self.assertIn("--cpu 4", result.stdout)
         self.assertIn("--lineage_dataset solanales_odb12", result.stdout)
+        self.assertIn("work/assemblies_prepared/solanum_chilense.fa.gz", result.stdout)
         self.assertIn("results/busco/solanum_chilense/run.complete", result.stdout)
 
 

@@ -43,6 +43,10 @@ def resolve_repo_path(path_text: str) -> Path:
 SAMPLES_MANIFEST = resolve_repo_path(str(config["samples"])).as_posix()
 BUSCO_DOWNLOAD_PATH = resolve_repo_path(str(config.get("busco_download_path", "work/busco_downloads"))).as_posix()
 BUSCO_WORK_ROOT = resolve_repo_path(str(config.get("busco_work_root", "work/busco"))).as_posix()
+ASSEMBLY_PREP_ROOT = Path(
+    str(config.get("assembly_prep_root", "work/assemblies_prepared")).removeprefix("./")
+).as_posix()
+ASSEMBLY_WRAP_WIDTH = int(config.get("assembly_wrap_width", 80))
 BUSCO_LINEAGE = str(config["busco_lineage"])
 OCCUPANCY_THRESHOLD = float(config.get("occupancy_threshold", 0.8))
 IQTREE_EXECUTABLE = str(config.get("iqtree_executable", "iqtree3"))
@@ -60,6 +64,8 @@ TAXON_NAME_MAP = "results/metadata/taxon_name_map.tsv"
 BUSCO_TOOL_VERSIONS = "results/metadata/busco_tool_versions.tsv"
 BUSCO_DATASETS = "results/metadata/busco_datasets.txt"
 BUSCO_LINEAGE_VERIFIED = "results/metadata/busco_lineage_verified.tsv"
+ASSEMBLY_PREPARED_PATTERN = f"{ASSEMBLY_PREP_ROOT}" + "/{sample}.fa.gz"
+ASSEMBLY_PREP_QC_PATTERN = f"{ASSEMBLY_PREP_ROOT}" + "/{sample}.prep.tsv"
 BUSCO_SUMMARY_TABLE = "results/qc/busco_summary.tsv"
 BUSCO_RECORDS_TABLE = "results/qc/busco_records.tsv"
 LOCUS_TAXON_MATRIX = "results/qc/locus_taxon_matrix.tsv"
@@ -118,6 +124,7 @@ def alignment_batch_markers(wildcards):
     return [alignment_batch_output_paths(batch_id)["completion"] for batch_id in batch_ids]
 
 include: "workflow/rules/manifest.smk"
+include: "workflow/rules/assembly_prep.smk"
 include: "workflow/rules/busco.smk"
 include: "workflow/rules/busco_summary.smk"
 include: "workflow/rules/locus_matrix.smk"

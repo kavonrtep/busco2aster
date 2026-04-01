@@ -16,6 +16,15 @@ rule create_env_busco:
         "touch {output}"
 
 
+rule create_env_assembly_prep:
+    output:
+        "/tmp/busco2aster_env_assembly_prep"
+    conda:
+        "../envs/assembly_prep.yaml"
+    shell:
+        "seqkit version >/dev/null && touch {output}"
+
+
 rule create_env_alignment:
     output:
         "/tmp/busco2aster_env_alignment"

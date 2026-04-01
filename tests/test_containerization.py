@@ -142,11 +142,26 @@ class ContainerizationUnitTests(unittest.TestCase):
             pipeline_dir = Path(tmpdir) / "pipeline"
             (pipeline_dir / "config").mkdir(parents=True)
             (pipeline_dir / "scripts").mkdir(parents=True)
+            (pipeline_dir / "reports").mkdir(parents=True)
 
             run_pipeline.prepare_runtime_workdir(workdir, pipeline_dir)
 
             self.assertTrue((workdir / "config").is_symlink())
             self.assertTrue((workdir / "scripts").is_symlink())
+            self.assertTrue((workdir / "reports").is_symlink())
+
+    def test_build_snakemake_command_defaults_to_all_target(self):
+        command = run_pipeline.build_snakemake_command(
+            config_path=Path("/tmp/config.yaml"),
+            repo_root=Path("/tmp/repo"),
+            workdir=Path("/tmp/work"),
+            threads=4,
+            target=None,
+            snakemake_args="--dry-run",
+        )
+
+        self.assertIn("all", command)
+        self.assertNotIn("results/report/report.html", command)
 
 
 class ContainerizationWorkflowTests(unittest.TestCase):
@@ -206,11 +221,19 @@ class ContainerizationWorkflowTests(unittest.TestCase):
             check=True,
         )
         self.assertIn("rule create_env_busco:", result.stdout)
+        self.assertIn("rule create_env_assembly_prep:", result.stdout)
         self.assertIn("rule create_env_alignment:", result.stdout)
         self.assertTrue(
             "rule create_env_report:" in result.stdout
             or "/tmp/busco2aster_env_report" in result.stdout
         )
+
+    def test_create_env_assembly_prep_rule_validates_seqkit(self):
+        helper_text = (REPO_ROOT / "workflow" / "rules" / "_create_envs.smk").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("/tmp/busco2aster_env_assembly_prep", helper_text)
+        self.assertIn("seqkit version", helper_text)
 
     def test_create_env_report_rule_validates_quarto_and_r_packages(self):
         helper_text = (REPO_ROOT / "workflow" / "rules" / "_create_envs.smk").read_text(
@@ -224,6 +247,7 @@ class ContainerizationWorkflowTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("--snakefile /opt/pipeline/workflow/Snakefile_create_envs", workflow_text)
+        self.assertIn("/tmp/busco2aster_env_assembly_prep", workflow_text)
         self.assertIn("/tmp/busco2aster_env_report", workflow_text)
 
     def test_run_pipeline_wrapper_supports_local_dry_run(self):

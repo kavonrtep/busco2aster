@@ -5,6 +5,7 @@ Snakemake rule files live here.
 Current implemented rule set:
 
 - `manifest.smk`: normalized manifest validation and metadata generation
+- `assembly_prep.smk`: per-sample FASTA normalization into wrapped gzipped cache files for BUSCO using `seqkit`
 - `busco.smk`: BUSCO tool metadata capture, lineage verification, per-sample BUSCO execution, and raw-scratch routing under `work/`
 - `busco_summary.smk`: BUSCO parsing and stable QC table generation
 - `locus_matrix.smk`: long-form locus matrix construction and retained-locus selection

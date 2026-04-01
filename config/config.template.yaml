@@ -5,6 +5,8 @@ busco_lineage: solanales_odb12
 # - BUSCO datasets download to work/busco_downloads
 # - IQ-TREE 3 / wASTRAL / ASTRAL4 are resolved from PATH
 # - the container wrapper injects container-internal tool paths automatically
+assembly_prep_root: work/assemblies_prepared
+assembly_wrap_width: 80
 busco_download_path: work/busco_downloads
 occupancy_threshold: 0.8
 species_tree_backend: wastral
@@ -17,6 +19,7 @@ iqtree_scfl_model: LG+G4
 
 threads:
   default: 4
+  assembly_prep: 4
   alignment: 1
   busco: 4
   concordance: 4
