@@ -14,7 +14,17 @@ from pathlib import Path
 from scripts.alignment import alignment_batch_output_paths, build_batch_ids, load_retained_locus_ids
 from scripts.busco import busco_output_paths
 from scripts.concordance import concordance_output_paths, quartet_output_paths
+from scripts.dna_extract import sample_dna_output_paths
 from scripts.gene_trees import gene_tree_directory_output_paths
+from scripts.sequence_mode import (
+    alignment_suffix,
+    iqtree_seqtype,
+    normalize_sequence_type,
+    raw_fasta_suffix,
+    resolve_scfl_model,
+    scfl_default_model,
+    sequence_length_unit,
+)
 from scripts.species_tree import species_tree_output_paths
 
 configfile: "config/config.yaml"
@@ -49,6 +59,11 @@ ASSEMBLY_PREP_ROOT = Path(
 ASSEMBLY_WRAP_WIDTH = int(config.get("assembly_wrap_width", 80))
 BUSCO_LINEAGE = str(config["busco_lineage"])
 OCCUPANCY_THRESHOLD = float(config.get("occupancy_threshold", 0.8))
+SEQUENCE_TYPE = normalize_sequence_type(str(config.get("sequence_type", "protein")))
+RAW_FASTA_SUFFIX = raw_fasta_suffix(SEQUENCE_TYPE)
+ALIGNMENT_SUFFIX = alignment_suffix(SEQUENCE_TYPE)
+SEQUENCE_LENGTH_UNIT = sequence_length_unit(SEQUENCE_TYPE)
+IQTREE_SEQTYPE = iqtree_seqtype(SEQUENCE_TYPE)
 IQTREE_EXECUTABLE = str(config.get("iqtree_executable", "iqtree3"))
 WASTRAL_EXECUTABLE = str(config.get("wastral_executable", "wastral"))
 ASTRAL4_EXECUTABLE = str(config.get("astral4_executable", "astral4"))
@@ -57,7 +72,10 @@ IQTREE_SUPPORT_MODE = str(config.get("iqtree_support_mode", "abayes"))
 IQTREE_SEED = int(config.get("iqtree_seed", 20260327))
 IQTREE_UFBOOT_REPLICATES = int(config.get("iqtree_ufboot_replicates", 1000))
 IQTREE_SCFL_QUARTETS = int(config.get("iqtree_scfl_quartets", 100))
-IQTREE_SCFL_MODEL = str(config.get("iqtree_scfl_model", "LG+G4"))
+IQTREE_SCFL_MODEL = resolve_scfl_model(
+    SEQUENCE_TYPE,
+    str(config.get("iqtree_scfl_model", scfl_default_model(SEQUENCE_TYPE))),
+)
 
 VALIDATED_MANIFEST = "results/metadata/samples.validated.tsv"
 TAXON_NAME_MAP = "results/metadata/taxon_name_map.tsv"
@@ -65,6 +83,8 @@ BUSCO_TOOL_VERSIONS = "results/metadata/busco_tool_versions.tsv"
 BUSCO_DATASETS = "results/metadata/busco_datasets.txt"
 BUSCO_LINEAGE_VERIFIED = "results/metadata/busco_lineage_verified.tsv"
 ASSEMBLY_PREPARED_PATTERN = f"{ASSEMBLY_PREP_ROOT}" + "/{sample}.fa.gz"
+ASSEMBLY_PREPARED_PLAIN_PATTERN = f"{ASSEMBLY_PREP_ROOT}" + "/{sample}.fa"
+ASSEMBLY_PREPARED_PLAIN_INDEX_PATTERN = f"{ASSEMBLY_PREP_ROOT}" + "/{sample}.fa.fai"
 ASSEMBLY_PREP_QC_PATTERN = f"{ASSEMBLY_PREP_ROOT}" + "/{sample}.prep.tsv"
 BUSCO_SUMMARY_TABLE = "results/qc/busco_summary.tsv"
 BUSCO_RECORDS_TABLE = "results/qc/busco_records.tsv"
@@ -107,11 +127,20 @@ SAMPLE_TO_ASSEMBLY = {
     for row in SAMPLE_RECORDS
 }
 BUSCO_OUTPUTS = {sample: busco_output_paths(sample) for sample in SAMPLES}
+DNA_SAMPLE_OUTPUTS = {sample: sample_dna_output_paths(sample) for sample in SAMPLES}
 BUSCO_COMPLETION_TARGETS = [BUSCO_OUTPUTS[sample]["completion"] for sample in SAMPLES]
+DNA_COMPLETION_TARGETS = [DNA_SAMPLE_OUTPUTS[sample]["completion"] for sample in SAMPLES]
+DNA_OUTPUT_ROOT = "results/dna_sequences"
+DNA_AGGREGATED_GFF_PATTERN = f"{DNA_OUTPUT_ROOT}" + "/{sample}/retained_loci.gff3"
+DNA_EXTRACTED_FASTA_PATTERN = f"{DNA_OUTPUT_ROOT}" + "/{sample}/retained_loci.fna"
+DNA_RECORDS_PATTERN = f"{DNA_OUTPUT_ROOT}" + "/{sample}/retained_loci.records.tsv"
+DNA_COMMAND_PATTERN = f"{DNA_OUTPUT_ROOT}" + "/{sample}/gffread.command.sh"
+DNA_LOG_PATTERN = f"{DNA_OUTPUT_ROOT}" + "/{sample}/gffread.log"
+DNA_COMPLETION_PATTERN = f"{DNA_OUTPUT_ROOT}" + "/{sample}/run.complete"
 BUSCO_SUMMARY_INPUTS = [
     BUSCO_OUTPUTS[sample][artifact]
     for sample in SAMPLES
-    for artifact in ("completion", "short_summary", "full_table", "paths")
+    for artifact in ("completion", "short_summary", "full_table", "paths", "sequence_root")
 ]
 ALIGNMENT_BATCH_SIZE = int(config.get("alignment_batch_size", 200))
 
@@ -128,6 +157,7 @@ include: "workflow/rules/assembly_prep.smk"
 include: "workflow/rules/busco.smk"
 include: "workflow/rules/busco_summary.smk"
 include: "workflow/rules/locus_matrix.smk"
+include: "workflow/rules/dna_extract.smk"
 include: "workflow/rules/alignment.smk"
 include: "workflow/rules/gene_trees.smk"
 include: "workflow/rules/species_tree.smk"

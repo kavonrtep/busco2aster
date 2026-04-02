@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .concordance import read_cf_stat_rows, read_freqquad_rows
 from .manifest import write_tsv
+from .sequence_mode import alignment_suffix, sequence_length_unit
 from .tree_utils import (
     branch_label_map,
     canonical_branch_key,
@@ -17,6 +18,7 @@ from .tree_utils import (
     internal_branch_key_map,
     iter_nodes,
     leaf_labels,
+    parse_newick,
     read_newick,
     relabel_tree_with_branch_ids,
     write_newick,
@@ -133,12 +135,16 @@ def _extract_alignment_summary(
     repo_root: Path,
     retained_rows: list[dict[str, str]],
     alignment_dir: Path,
+    sequence_type: str,
 ) -> list[dict[str, str]]:
     summary_rows: list[dict[str, str]] = []
     for row in retained_rows:
         if row["decision"] != "retain":
             continue
-        alignment_path = _resolve_path(repo_root, (alignment_dir / f"{row['locus_id']}.aln.faa").as_posix())
+        alignment_path = _resolve_path(
+            repo_root,
+            (alignment_dir / f"{row['locus_id']}.{alignment_suffix(sequence_type)}").as_posix(),
+        )
         records = read_fasta_records(alignment_path)
         lengths = {len(sequence) for _, sequence in records}
         if len(lengths) != 1:
@@ -151,7 +157,7 @@ def _extract_alignment_summary(
             {
                 "locus_id": row["locus_id"],
                 "sequence_count": str(len(records)),
-                "alignment_length_aa": str(alignment_length),
+                "alignment_length_sites": str(alignment_length),
                 "gap_fraction": _format_float(gap_fraction, digits=6),
                 "occupancy": row["occupancy"],
                 "length_dispersion_observed": row["length_dispersion_observed"],
@@ -357,10 +363,28 @@ def _extract_gene_tree_heterogeneity(
     heterogeneity_rows: list[dict[str, str]] = []
     topology_examples: dict[str, dict[str, str]] = {}
     topology_counts: Counter = Counter()
+    treefile_cache: dict[Path, list[str]] = {}
 
     for row in gene_tree_manifest_rows:
         tree_path = _resolve_path(repo_root, row["treefile"])
-        gene_root = read_newick(tree_path)
+        tree_row_index = (row.get("tree_row_index") or "").strip()
+        if tree_row_index:
+            tree_lines = treefile_cache.get(tree_path)
+            if tree_lines is None:
+                tree_lines = [
+                    line.strip()
+                    for line in tree_path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+                treefile_cache[tree_path] = tree_lines
+            line_index = int(tree_row_index) - 1
+            if line_index < 0 or line_index >= len(tree_lines):
+                raise ValueError(
+                    f"tree_row_index {tree_row_index!r} is out of range for {tree_path}."
+                )
+            gene_root = parse_newick(tree_lines[line_index])
+        else:
+            gene_root = read_newick(tree_path)
         gene_taxa = leaf_labels(gene_root)
         is_complete_taxon = gene_taxa == species_taxa
         topology_key = canonical_topology_key(gene_root)
@@ -419,10 +443,11 @@ def _extract_dataset_summary(
     sample_qc_rows: list[dict[str, str]],
     alignment_summary_rows: list[dict[str, str]],
     gene_tree_heterogeneity_rows: list[dict[str, str]],
+    sequence_type: str,
 ) -> list[dict[str, str]]:
     retained_count = sum(1 for row in retained_rows if row["decision"] == "retain")
     excluded_count = sum(1 for row in retained_rows if row["decision"] != "retain")
-    alignment_lengths = [int(row["alignment_length_aa"]) for row in alignment_summary_rows]
+    alignment_lengths = [int(row["alignment_length_sites"]) for row in alignment_summary_rows]
     mean_alignment = statistics.fmean(alignment_lengths) if alignment_lengths else 0.0
     median_alignment = statistics.median(alignment_lengths) if alignment_lengths else 0.0
     complete_gene_trees = sum(1 for row in gene_tree_heterogeneity_rows if row["is_complete_taxon"] == "true")
@@ -431,16 +456,18 @@ def _extract_dataset_summary(
 
     return [
         {
+            "sequence_type": sequence_type,
+            "sequence_length_unit": sequence_length_unit(sequence_type),
             "sample_count": str(len(busco_summary_rows)),
             "candidate_loci": str(len(retained_rows)),
             "retained_loci": str(retained_count),
             "excluded_loci": str(excluded_count),
             "mean_retained_missing_fraction": _format_float(mean_missing_fraction, digits=6),
             "alignment_count": str(len(alignment_summary_rows)),
-            "mean_alignment_length_aa": _format_float(mean_alignment, digits=2),
-            "median_alignment_length_aa": _format_float(median_alignment, digits=2),
-            "min_alignment_length_aa": str(min(alignment_lengths) if alignment_lengths else 0),
-            "max_alignment_length_aa": str(max(alignment_lengths) if alignment_lengths else 0),
+            "mean_alignment_length_sites": _format_float(mean_alignment, digits=2),
+            "median_alignment_length_sites": _format_float(median_alignment, digits=2),
+            "min_alignment_length_sites": str(min(alignment_lengths) if alignment_lengths else 0),
+            "max_alignment_length_sites": str(max(alignment_lengths) if alignment_lengths else 0),
             "gene_tree_count": str(len(gene_tree_heterogeneity_rows)),
             "complete_taxon_gene_tree_count": str(complete_gene_trees),
         }
@@ -462,6 +489,7 @@ def build_report_data_bundle(
     quartet_freqquad_path: Path,
     alignment_dir: Path,
     output_dir: Path,
+    sequence_type: str = "protein",
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -480,6 +508,7 @@ def build_report_data_bundle(
         repo_root=repo_root,
         retained_rows=retained_rows,
         alignment_dir=alignment_dir,
+        sequence_type=sequence_type,
     )
     branch_metric_rows, branch_alternative_rows = _extract_branch_tables(
         species_tree_path=species_tree_path,
@@ -501,22 +530,25 @@ def build_report_data_bundle(
         sample_qc_rows=sample_qc_rows,
         alignment_summary_rows=alignment_summary_rows,
         gene_tree_heterogeneity_rows=heterogeneity_rows,
+        sequence_type=sequence_type,
     )
 
     write_tsv(
         output_dir / "dataset_summary.tsv",
         dataset_summary_rows,
         [
+            "sequence_type",
+            "sequence_length_unit",
             "sample_count",
             "candidate_loci",
             "retained_loci",
             "excluded_loci",
             "mean_retained_missing_fraction",
             "alignment_count",
-            "mean_alignment_length_aa",
-            "median_alignment_length_aa",
-            "min_alignment_length_aa",
-            "max_alignment_length_aa",
+            "mean_alignment_length_sites",
+            "median_alignment_length_sites",
+            "min_alignment_length_sites",
+            "max_alignment_length_sites",
             "gene_tree_count",
             "complete_taxon_gene_tree_count",
         ],
@@ -550,7 +582,7 @@ def build_report_data_bundle(
         [
             "locus_id",
             "sequence_count",
-            "alignment_length_aa",
+            "alignment_length_sites",
             "gap_fraction",
             "occupancy",
             "length_dispersion_observed",

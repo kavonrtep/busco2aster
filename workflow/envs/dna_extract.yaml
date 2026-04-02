@@ -3,5 +3,4 @@ channels:
   - bioconda
 dependencies:
   - python=3.11
-  - seqkit>=2,<3
-  - samtools>=1.18,<2
+  - gffread>=0.12,<1

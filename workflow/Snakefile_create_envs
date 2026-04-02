@@ -13,4 +13,4 @@ include: "rules/_create_envs.smk"
 
 rule all:
     input:
-        expand("/tmp/busco2aster_env_{env}", env=["busco", "assembly_prep", "alignment", "report"])
+        expand("/tmp/busco2aster_env_{env}", env=["busco", "assembly_prep", "dna_extract", "alignment", "report"])

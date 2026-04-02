@@ -27,6 +27,11 @@ def parse_args() -> argparse.Namespace:
         default=".",
         help="Repository root used to resolve relative source FASTA paths.",
     )
+    parser.add_argument(
+        "--sequence-type",
+        default="protein",
+        help="Sequence type to export: protein or dna. Default: protein.",
+    )
     return parser.parse_args()
 
 
@@ -38,6 +43,7 @@ def main() -> int:
         output_dir=Path(args.output_dir),
         manifest_path=Path(args.manifest),
         repo_root=Path(args.repo_root).resolve(),
+        sequence_type=args.sequence_type,
     )
     return 0
 

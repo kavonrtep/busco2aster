@@ -25,6 +25,7 @@ rule prepare_visual_report_data:
         repo_root=REPO_ROOT.as_posix(),
         alignment_dir=ALIGNMENT_DIR,
         output_dir=REPORT_DATA_DIR,
+        sequence_type=SEQUENCE_TYPE,
     shell:
         (
             "python3 -m scripts.prepare_visual_report_data "
@@ -40,6 +41,7 @@ rule prepare_visual_report_data:
             "--scfl-branch {input.scfl_branch:q} "
             "--quartet-freqquad {input.quartet_freqquad:q} "
             "--alignment-dir {params.alignment_dir:q} "
+            "--sequence-type {params.sequence_type:q} "
             "--output-dir {params.output_dir:q}"
         )
 

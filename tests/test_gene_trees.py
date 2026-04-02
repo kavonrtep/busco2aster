@@ -234,9 +234,11 @@ class GeneTreeWorkflowTests(unittest.TestCase):
             manifest_rows = list(csv.DictReader(handle, delimiter="\t"))
 
         self.assertEqual(len(manifest_rows), len(retained_ids))
+        self.assertEqual({row["locus_id"] for row in manifest_rows}, set(retained_ids))
+        self.assertEqual(len({row["locus_id"] for row in manifest_rows}), len(manifest_rows))
         self.assertEqual(
-            [row["locus_id"] for row in manifest_rows],
-            sorted(retained_ids, key=lambda value: (int(value.split("at", 1)[0]), value.split("at", 1)[1])),
+            [int(row["tree_row_index"]) for row in manifest_rows],
+            list(range(1, len(manifest_rows) + 1)),
         )
 
 

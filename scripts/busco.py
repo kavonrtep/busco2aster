@@ -360,6 +360,24 @@ def resolve_busco_sequence_paths(
     }
 
 
+def hydrate_stable_busco_sequence_paths(
+    artifact_paths: dict[str, str],
+    stable_paths: dict[str, str],
+    repo_root: Path,
+) -> dict[str, str]:
+    hydrated = dict(artifact_paths)
+    stable_artifacts = {
+        "single_copy_busco_sequences": stable_paths["single_copy_sequence_dir"],
+        "multi_copy_busco_sequences": stable_paths["multi_copy_sequence_dir"],
+        "fragmented_busco_sequences": stable_paths["fragmented_sequence_dir"],
+    }
+    for artifact_name, stable_dir in stable_artifacts.items():
+        stable_path = _resolve_repo_path(repo_root, stable_dir)
+        if stable_path.is_dir():
+            hydrated[artifact_name] = stable_dir
+    return hydrated
+
+
 def build_busco_tables(validated_manifest_path: Path, repo_root: Path) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     summary_rows: list[dict[str, object]] = []
     record_rows: list[dict[str, object]] = []
@@ -378,7 +396,11 @@ def build_busco_tables(validated_manifest_path: Path, repo_root: Path) -> tuple[
                     f"Expected BUSCO {name} file for sample {sample_id!r}: {path}"
                 )
 
-        artifact_paths = load_busco_artifact_paths(required_paths["paths"])
+        artifact_paths = hydrate_stable_busco_sequence_paths(
+            load_busco_artifact_paths(required_paths["paths"]),
+            stable_paths,
+            repo_root,
+        )
         summary = parse_busco_short_summary(required_paths["short_summary"])
         full_table_rows = parse_busco_full_table(required_paths["full_table"])
         table_counts = summarize_busco_full_table(full_table_rows)

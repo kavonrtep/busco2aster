@@ -69,7 +69,8 @@ tree_order <- tree_plot_base$data %>%
 
 - Taxa analyzed: `r summary_row$sample_count`
 - Candidate loci: `r summary_row$candidate_loci`; retained loci: `r summary_row$retained_loci`
-- Mean alignment length: `r round(as.numeric(summary_row$mean_alignment_length_aa), 1)` aa
+- Sequence type: `r summary_row$sequence_type`
+- Mean alignment length: `r round(as.numeric(summary_row$mean_alignment_length_sites), 1)` `r summary_row$sequence_length_unit`
 - Complete-taxon gene trees: `r summary_row$complete_taxon_gene_tree_count`
 - Weakest concordance branch: `r branch_metrics %>% arrange(gcf) %>% slice(1) %>% pull(label)`
 - Weakest ASTER quartet branch: `r branch_metrics %>% arrange(aster_q1_pct) %>% slice(1) %>% pull(label)`
@@ -115,10 +116,10 @@ missingness_plot <- sample_qc %>%
   theme_minimal(base_size = 11)
 
 alignment_plot <- alignment_summary %>%
-  mutate(alignment_length_aa = as.numeric(alignment_length_aa)) %>%
-  ggplot(aes(x = alignment_length_aa)) +
+  mutate(alignment_length_sites = as.numeric(alignment_length_sites)) %>%
+  ggplot(aes(x = alignment_length_sites)) +
   geom_histogram(binwidth = 25, fill = "#4c78a8", color = "white") +
-  labs(x = "Alignment length (aa)", y = "Loci", title = "Alignment length distribution") +
+  labs(x = paste("Alignment length (", summary_row$sequence_length_unit, ")", sep = ""), y = "Loci", title = "Alignment length distribution") +
   theme_minimal(base_size = 11)
 
 filter_plot_data <- locus_summary %>%

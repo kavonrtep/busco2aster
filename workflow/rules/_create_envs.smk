@@ -34,6 +34,15 @@ rule create_env_alignment:
         "touch {output}"
 
 
+rule create_env_dna_extract:
+    output:
+        "/tmp/busco2aster_env_dna_extract"
+    conda:
+        "../envs/dna_extract.yaml"
+    shell:
+        "gffread --version >/dev/null 2>&1 && touch {output}"
+
+
 rule create_env_report:
     output:
         "/tmp/busco2aster_env_report"

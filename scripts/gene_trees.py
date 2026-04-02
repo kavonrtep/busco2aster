@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .alignment import busco_sort_key, load_retained_locus_ids
 from .manifest import write_tsv
+from .sequence_mode import locus_id_from_alignment_filename
 
 
 SUPPORTED_SUPPORT_MODES = {"abayes", "ufboot"}
@@ -59,6 +60,7 @@ def build_iqtree_command(
     support_mode: str,
     seed: int,
     ufboot_replicates: int | None = None,
+    seqtype: str = "AA",
 ) -> list[str]:
     if support_mode not in SUPPORTED_SUPPORT_MODES:
         raise ValueError(
@@ -71,7 +73,7 @@ def build_iqtree_command(
         "-s",
         alignment_path,
         "--seqtype",
-        "AA",
+        seqtype,
         "-m",
         model,
         "-T",
@@ -101,6 +103,7 @@ def build_iqtree_directory_command(
     support_mode: str,
     seed: int,
     ufboot_replicates: int | None = None,
+    seqtype: str = "AA",
 ) -> list[str]:
     if support_mode not in SUPPORTED_SUPPORT_MODES:
         raise ValueError(
@@ -113,7 +116,7 @@ def build_iqtree_directory_command(
         "-S",
         alignment_dir,
         "--seqtype",
-        "AA",
+        seqtype,
         "-m",
         model,
         "-T",
@@ -239,7 +242,7 @@ def load_gene_tree_locus_ids(path: Path) -> list[str]:
 
 
 def _alignment_name_to_locus_id(alignment_name: str) -> str:
-    return Path(alignment_name).name.removesuffix(".aln.faa")
+    return locus_id_from_alignment_filename(alignment_name)
 
 
 def parse_directory_mode_selected_models(best_model_nex_path: Path) -> list[tuple[str, str]]:

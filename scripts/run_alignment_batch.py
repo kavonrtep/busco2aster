@@ -16,6 +16,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-id", required=True)
     parser.add_argument("--batch-size", required=True, type=int)
     parser.add_argument("--threads-per-alignment", required=True, type=int)
+    parser.add_argument("--sequence-type", default="protein")
     parser.add_argument("--mafft-executable", default="mafft")
     return parser.parse_args()
 
@@ -29,6 +30,7 @@ def main() -> int:
         batch_id=args.batch_id,
         batch_size=args.batch_size,
         threads_per_alignment=args.threads_per_alignment,
+        sequence_type=args.sequence_type,
         mafft_executable=args.mafft_executable,
     )
     return 0

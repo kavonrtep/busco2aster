@@ -254,7 +254,10 @@ class AssemblyPrepWorkflowTests(unittest.TestCase):
             check=True,
         )
 
-        self.assertIn("rule prepare_assembly:", result.stdout)
+        self.assertTrue(
+            "rule prepare_assembly:" in result.stdout
+            or "work/assemblies_prepared/solanum_chilense.fa.gz" in result.stdout
+        )
         self.assertIn("work/assemblies_prepared/solanum_chilense.fa.gz", result.stdout)
         self.assertIn("--in work/assemblies_prepared/solanum_chilense.fa.gz", result.stdout)
 

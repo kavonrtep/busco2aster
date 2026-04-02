@@ -20,7 +20,7 @@ iqtree_support_mode: abayes
 iqtree_seed: 20260327
 iqtree_ufboot_replicates: 1000
 iqtree_scfl_quartets: 100
-iqtree_scfl_model: LG+G4
+iqtree_scfl_model: auto
 threads:
   default: 4
   alignment: 1

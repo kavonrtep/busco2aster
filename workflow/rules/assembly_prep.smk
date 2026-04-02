@@ -19,3 +19,21 @@ rule prepare_assembly:
             "--wrap-width {params.wrap_width} "
             "--threads {threads}"
         )
+
+
+rule prepare_assembly_plain:
+    input:
+        prepared=ASSEMBLY_PREPARED_PATTERN,
+        qc=ASSEMBLY_PREP_QC_PATTERN,
+    output:
+        prepared=ASSEMBLY_PREPARED_PLAIN_PATTERN,
+        index=ASSEMBLY_PREPARED_PLAIN_INDEX_PATTERN,
+    threads:
+        1
+    conda:
+        "../envs/assembly_prep.yaml"
+    shell:
+        r"""
+        gzip -cd {input.prepared:q} > {output.prepared:q}
+        samtools faidx {output.prepared:q}
+        """

@@ -23,39 +23,42 @@ def main() -> int:
     data_dir = Path(args.data_dir).resolve()
     output_path = Path(args.output).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    repo_root = qmd_path.parent.parent.resolve()
-    try:
-        qmd_arg = qmd_path.relative_to(repo_root).as_posix()
-        output_dir_arg = output_path.parent.relative_to(repo_root).as_posix()
-    except ValueError:
-        qmd_arg = qmd_path.as_posix()
-        output_dir_arg = output_path.parent.as_posix()
 
     command = [
         args.quarto_executable,
         "render",
-        qmd_arg,
+        qmd_path.as_posix(),
         "--to",
         "html",
         "--output",
         output_path.name,
-        "--output-dir",
-        output_dir_arg,
         "-P",
         f"data_dir:{data_dir.as_posix()}",
     ]
-    subprocess.run(command, check=True, cwd=repo_root)
+    subprocess.run(command, check=True, cwd=output_path.parent)
+
+    source_sidecar = qmd_path.parent / f"{qmd_path.stem}_files"
+    target_sidecar = output_path.parent / f"{output_path.stem}_files"
+    if source_sidecar.is_dir():
+        if target_sidecar.exists():
+            shutil.rmtree(target_sidecar)
+        shutil.copytree(source_sidecar, target_sidecar)
+        if source_sidecar.resolve() != target_sidecar.resolve():
+            shutil.rmtree(source_sidecar)
+
     if output_path.is_file():
         return 0
 
     fallback_candidates = [
-        repo_root / "results" / output_path.name,
-        repo_root / output_path.name,
+        output_path.parent / output_path.name,
+        output_path.parent.parent / output_path.name,
+        qmd_path.parent / output_path.name,
     ]
     for candidate in fallback_candidates:
         if candidate.is_file():
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(candidate.as_posix(), output_path.as_posix())
+            if candidate.resolve() != output_path:
+                shutil.move(candidate.as_posix(), output_path.as_posix())
             return 0
 
     raise FileNotFoundError(f"Quarto render completed but output was not found at {output_path}.")

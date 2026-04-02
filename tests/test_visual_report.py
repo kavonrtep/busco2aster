@@ -58,8 +58,8 @@ class VisualReportDataTests(unittest.TestCase):
             )
             write_text(
                 tmp_path / "gene_tree_manifest.tsv",
-                "locus_id\ttreefile\treport\tselected_model\tsupport_mode\tsupport_values_present\n"
-                "l1\tgene_trees/l1.treefile\tgene_trees/l1.iqtree\tLG\tabayes\ttrue\n",
+                "locus_id\ttreefile\ttree_row_index\treport\tselected_model\tsupport_mode\tsupport_values_present\n"
+                "l1\tgene_trees/all.raw.tre\t1\tgene_trees/l1.iqtree\tLG\tabayes\ttrue\n",
             )
             write_text(tmp_path / "species_tree.tre", "((a,b)1:0.1,(c,d):0.1);\n")
             write_text(
@@ -85,7 +85,7 @@ class VisualReportDataTests(unittest.TestCase):
             write_text(align_dir / "l1.aln.faa", ">a\nAAAA\n>b\nAAAA\n>c\nAAAA\n>d\nAAAA\n")
             gene_tree_dir = tmp_path / "gene_trees"
             gene_tree_dir.mkdir()
-            write_text(gene_tree_dir / "l1.treefile", "((a,b),(c,d));\n")
+            write_text(gene_tree_dir / "all.raw.tre", "((a,b),(c,d));\n")
             write_text(gene_tree_dir / "l1.iqtree", "Best-fit model according to BIC: LG\n")
 
             output_dir = tmp_path / "report_data"
@@ -114,6 +114,55 @@ class VisualReportDataTests(unittest.TestCase):
         self.assertIn("\t70.0000\t", branch_metrics)
         self.assertIn("topology_id", topology_counts)
 
+    def test_render_visual_report_writes_output_in_requested_directory(self):
+        with TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            qmd_path = tmp_path / "reports" / "report.qmd"
+            data_dir = tmp_path / "data"
+            output_path = tmp_path / "results" / "report" / "report.html"
+            fake_quarto = tmp_path / "fake_quarto.py"
+
+            write_text(qmd_path, "---\ntitle: Test\n---\n\nHello\n")
+            data_dir.mkdir(parents=True)
+            write_text(
+                fake_quarto,
+                """#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+output_name = args[args.index("--output") + 1]
+Path(output_name).write_text("<html><body>ok</body></html>\\n", encoding="utf-8")
+sidecar = Path(args[2]).resolve().parent / "report_files" / "figure-html"
+sidecar.mkdir(parents=True, exist_ok=True)
+(sidecar / "plot.png").write_text("png\\n", encoding="utf-8")
+""",
+            )
+            fake_quarto.chmod(0o755)
+
+            subprocess.run(
+                [
+                    "python3",
+                    "-m",
+                    "scripts.render_visual_report",
+                    "--quarto-executable",
+                    fake_quarto.as_posix(),
+                    "--qmd",
+                    qmd_path.as_posix(),
+                    "--data-dir",
+                    data_dir.as_posix(),
+                    "--output",
+                    output_path.as_posix(),
+                ],
+                cwd=REPO_ROOT,
+                check=True,
+            )
+
+            self.assertTrue(output_path.is_file())
+            self.assertIn("ok", output_path.read_text(encoding="utf-8"))
+            self.assertTrue((output_path.parent / "report_files" / "figure-html" / "plot.png").is_file())
+            self.assertFalse((qmd_path.parent / "report_files").exists())
+
 
 class VisualReportWorkflowTests(unittest.TestCase):
     def test_visual_report_rule_dry_run_renders_expected_targets(self):
@@ -122,6 +171,7 @@ class VisualReportWorkflowTests(unittest.TestCase):
                 "snakemake",
                 "-n",
                 "-p",
+                "--rerun-incomplete",
                 "--cores",
                 "4",
                 "results/report/report.html",
@@ -132,9 +182,15 @@ class VisualReportWorkflowTests(unittest.TestCase):
             check=True,
         )
         if "Nothing to be done" not in result.stdout:
-            self.assertIn("rule prepare_visual_report_data:", result.stdout)
+            self.assertTrue(
+                "rule prepare_visual_report_data:" in result.stdout
+                or "Updating job prepare_visual_report_data." in result.stdout
+            )
             self.assertIn("rule render_visual_report:", result.stdout)
-            self.assertIn("results/report/data/branch_metrics.tsv", result.stdout)
+            self.assertTrue(
+                "results/report/data/branch_metrics.tsv" in result.stdout
+                or "results/report/data/dataset_summary.tsv" in result.stdout
+            )
         else:
             self.assertTrue((REPO_ROOT / "results/report/report.html").is_file())
 

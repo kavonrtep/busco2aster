@@ -60,6 +60,13 @@ jobs:
             --conda-prefix /opt/conda/envs \
             --conda-frontend conda \
             --cores 1 \
+            /tmp/busco2aster_env_dna_extract
+          apptainer exec busco2aster.sif snakemake \
+            --snakefile /opt/pipeline/workflow/Snakefile_create_envs \
+            --use-conda \
+            --conda-prefix /opt/conda/envs \
+            --conda-frontend conda \
+            --cores 1 \
             /tmp/busco2aster_env_report
 
       - name: Upload SIF to GitHub Release

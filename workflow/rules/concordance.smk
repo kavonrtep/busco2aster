@@ -51,7 +51,7 @@ rule infer_site_concordance:
         prefix=SCFL_OUTPUTS["prefix"],
         alignment_dir=ALIGNMENT_DIR,
         quartets=IQTREE_SCFL_QUARTETS,
-        seqtype="AA",
+        seqtype=IQTREE_SEQTYPE,
         model=IQTREE_SCFL_MODEL,
     threads:
         get_thread_count("concordance")

@@ -260,6 +260,7 @@ class ContainerizationWorkflowTests(unittest.TestCase):
         )
         self.assertIn("rule create_env_busco:", result.stdout)
         self.assertIn("rule create_env_assembly_prep:", result.stdout)
+        self.assertIn("rule create_env_dna_extract:", result.stdout)
         self.assertIn("rule create_env_alignment:", result.stdout)
         self.assertTrue(
             "rule create_env_report:" in result.stdout
@@ -272,6 +273,13 @@ class ContainerizationWorkflowTests(unittest.TestCase):
         )
         self.assertIn("/tmp/busco2aster_env_assembly_prep", helper_text)
         self.assertIn("seqkit version", helper_text)
+
+    def test_create_env_dna_extract_rule_validates_gffread(self):
+        helper_text = (REPO_ROOT / "workflow" / "rules" / "_create_envs.smk").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("/tmp/busco2aster_env_dna_extract", helper_text)
+        self.assertIn("gffread --version", helper_text)
 
     def test_create_env_report_rule_validates_quarto_and_r_packages(self):
         helper_text = (REPO_ROOT / "workflow" / "rules" / "_create_envs.smk").read_text(
@@ -286,6 +294,7 @@ class ContainerizationWorkflowTests(unittest.TestCase):
         )
         self.assertIn("--snakefile /opt/pipeline/workflow/Snakefile_create_envs", workflow_text)
         self.assertIn("/tmp/busco2aster_env_assembly_prep", workflow_text)
+        self.assertIn("/tmp/busco2aster_env_dna_extract", workflow_text)
         self.assertIn("/tmp/busco2aster_env_report", workflow_text)
 
     def test_run_pipeline_wrapper_supports_local_dry_run(self):

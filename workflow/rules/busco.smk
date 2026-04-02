@@ -39,6 +39,7 @@ rule run_busco:
     output:
         command="results/busco/{sample}/command.sh",
         paths="results/busco/{sample}/paths.tsv",
+        sequences=directory("results/busco/{sample}/busco_sequences"),
         short_summary="results/busco/{sample}/short_summary.txt",
         full_table="results/busco/{sample}/full_table.tsv",
         completion="results/busco/{sample}/run.complete",
@@ -56,7 +57,7 @@ rule run_busco:
         mkdir -p {params.sample_dir:q}
         mkdir -p {params.raw_root:q}
         printf '#!/usr/bin/env bash\nset -euo pipefail\n' > {output.command:q}
-        printf '%s\n' "busco --in {input.assembly:q} --mode genome --lineage_dataset {params.lineage:q} --cpu {threads} --out {wildcards.sample:q} --out_path {params.raw_root:q} --download_path {params.download_path:q}" >> {output.command:q}
+        printf '%s\n' "busco --in {input.assembly:q} --mode genome --lineage_dataset {params.lineage:q} --cpu {threads} --out {wildcards.sample:q} --out_path {params.raw_root:q} --download_path {params.download_path:q} -f" >> {output.command:q}
         bash {output.command:q}
         python3 -m scripts.standardize_busco_run --sample-id {wildcards.sample:q} --sample-dir {params.sample_dir:q} --raw-root {params.raw_root:q}
         """

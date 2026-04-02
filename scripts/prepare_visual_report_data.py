@@ -23,6 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--quartet-freqquad", required=True)
     parser.add_argument("--alignment-dir", required=True)
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--sequence-type", default="protein")
     return parser.parse_args()
 
 
@@ -42,6 +43,7 @@ def main() -> int:
         quartet_freqquad_path=Path(args.quartet_freqquad),
         alignment_dir=Path(args.alignment_dir),
         output_dir=Path(args.output_dir),
+        sequence_type=args.sequence_type,
     )
     return 0
 

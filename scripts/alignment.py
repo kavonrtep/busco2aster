@@ -1,4 +1,4 @@
-"""Helpers for retained-locus FASTA export and protein alignment paths."""
+"""Helpers for retained-locus FASTA export and sequence-type-aware alignments."""
 
 from __future__ import annotations
 
@@ -6,8 +6,16 @@ import csv
 import subprocess
 from pathlib import Path
 
+from .dna_extract import per_locus_dna_sequence_path
 from .locus_matrix import parse_fasta_records
 from .manifest import write_tsv
+from .sequence_mode import (
+    alignment_path as build_alignment_path,
+    alignment_suffix,
+    mafft_mode_arguments,
+    raw_fasta_path as build_raw_fasta_path,
+    raw_fasta_suffix,
+)
 
 
 def busco_sort_key(locus_id: str) -> tuple[int, str]:
@@ -17,9 +25,9 @@ def busco_sort_key(locus_id: str) -> tuple[int, str]:
     return 0, locus_id
 
 
-def locus_output_paths(locus_id: str) -> dict[str, str]:
-    raw_fasta = Path("results") / "loci" / "raw_fastas" / f"{locus_id}.faa"
-    alignment = Path("results") / "loci" / "alignments" / f"{locus_id}.aln.faa"
+def locus_output_paths(locus_id: str, sequence_type: str = "protein") -> dict[str, str]:
+    raw_fasta = build_raw_fasta_path(Path("results") / "loci" / "raw_fastas", locus_id, sequence_type)
+    alignment = build_alignment_path(Path("results") / "loci" / "alignments", locus_id, sequence_type)
     log = Path("results") / "loci" / "logs" / "mafft" / f"{locus_id}.log"
     return {
         "raw_fasta": raw_fasta.as_posix(),
@@ -105,8 +113,8 @@ def _build_matrix_index(
     return index
 
 
-def _read_single_sequence(faa_path: str, repo_root: Path) -> str:
-    resolved_path = _resolve_repo_path(repo_root, faa_path)
+def _read_single_sequence(sequence_path: str, repo_root: Path) -> str:
+    resolved_path = _resolve_repo_path(repo_root, sequence_path)
     if not resolved_path.is_file():
         raise ValueError(f"Expected locus sequence FASTA does not exist: {resolved_path}")
     records = parse_fasta_records(resolved_path)
@@ -121,6 +129,7 @@ def _build_locus_fasta_records(
     matrix_rows: list[dict[str, str]],
     retained_row: dict[str, str],
     repo_root: Path,
+    sequence_type: str,
 ) -> list[tuple[str, str]]:
     if not matrix_rows:
         raise ValueError(f"Locus {locus_id!r} has no retained matrix rows.")
@@ -133,7 +142,15 @@ def _build_locus_fasta_records(
         )
 
     return [
-        (row["sanitized_taxon_id"], _read_single_sequence(row["faa_path"], repo_root))
+        (
+            row["sanitized_taxon_id"],
+            _read_single_sequence(
+                row["faa_path"]
+                if sequence_type == "protein"
+                else per_locus_dna_sequence_path(row["sample_id"], locus_id),
+                repo_root,
+            ),
+        )
         for row in matrix_rows
     ]
 
@@ -153,11 +170,18 @@ def export_locus_fasta(
     retained_path: Path,
     output_path: Path,
     repo_root: Path,
+    sequence_type: str = "protein",
 ) -> None:
     retained_row = _load_retained_locus_row(retained_path, locus_id)
     matrix_index = _build_matrix_index(matrix_path, {locus_id})
     matrix_rows = matrix_index.get(locus_id, [])
-    records = _build_locus_fasta_records(locus_id, matrix_rows, retained_row, repo_root)
+    records = _build_locus_fasta_records(
+        locus_id,
+        matrix_rows,
+        retained_row,
+        repo_root,
+        sequence_type,
+    )
     _write_fasta_records(output_path, records)
 
 
@@ -167,6 +191,7 @@ def export_retained_fastas(
     output_dir: Path,
     manifest_path: Path,
     repo_root: Path,
+    sequence_type: str = "protein",
 ) -> None:
     retained_map = _build_retained_locus_map(retained_path)
     retained_locus_ids = set(retained_map)
@@ -176,12 +201,13 @@ def export_retained_fastas(
     expected_files = set()
     manifest_rows = []
     for locus_id in sorted(retained_locus_ids, key=busco_sort_key):
-        output_path = output_dir / f"{locus_id}.faa"
+        output_path = build_raw_fasta_path(output_dir, locus_id, sequence_type)
         records = _build_locus_fasta_records(
             locus_id=locus_id,
             matrix_rows=matrix_index.get(locus_id, []),
             retained_row=retained_map[locus_id],
             repo_root=repo_root,
+            sequence_type=sequence_type,
         )
         _write_fasta_records(output_path, records)
         expected_files.add(output_path.name)
@@ -193,9 +219,10 @@ def export_retained_fastas(
             }
         )
 
-    for path in output_dir.glob("*.faa"):
-        if path.name not in expected_files:
-            path.unlink()
+    for pattern in ("*.faa", "*.fna"):
+        for path in output_dir.glob(pattern):
+            if path.name not in expected_files:
+                path.unlink()
 
     write_tsv(
         manifest_path,
@@ -211,6 +238,7 @@ def run_alignment_batch(
     batch_id: str,
     batch_size: int,
     threads_per_alignment: int,
+    sequence_type: str = "protein",
     mafft_executable: str = "mafft",
 ) -> None:
     manifest_rows = load_raw_fasta_manifest_rows(manifest_path)
@@ -224,7 +252,7 @@ def run_alignment_batch(
     for row in batch_rows:
         locus_id = row["locus_id"]
         raw_fasta = Path(row["raw_fasta"])
-        outputs = locus_output_paths(locus_id)
+        outputs = locus_output_paths(locus_id, sequence_type)
         alignment_path = Path(outputs["alignment"])
         log_path = Path(outputs["log"])
         alignment_path.parent.mkdir(parents=True, exist_ok=True)
@@ -232,13 +260,14 @@ def run_alignment_batch(
 
         command = [
             mafft_executable,
-            "--amino",
-            "--anysymbol",
+            *mafft_mode_arguments(sequence_type),
             "--auto",
             "--thread",
             str(threads_per_alignment),
             raw_fasta.as_posix(),
         ]
+        if sequence_type == "protein":
+            command.insert(2 if command[1:2] == ["--amino"] else 1, "--anysymbol")
         with alignment_path.open("w", encoding="utf-8") as stdout_handle, log_path.open(
             "w", encoding="utf-8"
         ) as stderr_handle:
@@ -247,15 +276,22 @@ def run_alignment_batch(
 
 def sync_alignment_outputs(manifest_path: Path, output_dir: Path, log_dir: Path) -> None:
     manifest_rows = load_raw_fasta_manifest_rows(manifest_path)
-    expected_alignments = {f"{row['locus_id']}.aln.faa" for row in manifest_rows}
+    expected_alignments = set()
+    for row in manifest_rows:
+        raw_name = Path(row["raw_fasta"]).name
+        if raw_name.endswith(".fna"):
+            expected_alignments.add(raw_name.removesuffix(".fna") + ".aln.fna")
+        else:
+            expected_alignments.add(raw_name.removesuffix(".faa") + ".aln.faa")
     expected_logs = {f"{row['locus_id']}.log" for row in manifest_rows}
 
     output_dir.mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)
 
-    for path in output_dir.glob("*.aln.faa"):
-        if path.name not in expected_alignments:
-            path.unlink()
+    for pattern in ("*.aln.faa", "*.aln.fna"):
+        for path in output_dir.glob(pattern):
+            if path.name not in expected_alignments:
+                path.unlink()
 
     for path in log_dir.glob("*.log"):
         if path.name not in expected_logs:
