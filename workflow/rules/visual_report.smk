@@ -11,6 +11,9 @@ rule prepare_visual_report_data:
         scfl_branch=SCFL_OUTPUTS["branch"],
         quartet_freqquad=WASTRAL_QUARTET_OUTPUTS["freqquad"],
         alignments_complete=ALIGNMENTS_COMPLETE,
+        **({
+            "topology_tests_complete": TOPOLOGY_TESTS_OUTPUTS["completion"],
+        } if RUN_TOPOLOGY_TESTS else {}),
     output:
         dataset_summary=REPORT_DATASET_SUMMARY,
         sample_qc=REPORT_SAMPLE_QC,
@@ -26,6 +29,10 @@ rule prepare_visual_report_data:
         alignment_dir=ALIGNMENT_DIR,
         output_dir=REPORT_DATA_DIR,
         sequence_type=SEQUENCE_TYPE,
+        topology_tests_results_dir=(
+            str(Path(TOPOLOGY_TESTS_OUTPUTS["au_results"]).parent)
+            if RUN_TOPOLOGY_TESTS else ""
+        ),
     shell:
         (
             "python3 -m scripts.prepare_visual_report_data "
@@ -43,6 +50,10 @@ rule prepare_visual_report_data:
             "--alignment-dir {params.alignment_dir:q} "
             "--sequence-type {params.sequence_type:q} "
             "--output-dir {params.output_dir:q}"
+            + (
+                " --topology-tests-results-dir {params.topology_tests_results_dir:q}"
+                if RUN_TOPOLOGY_TESTS else ""
+            )
         )
 
 

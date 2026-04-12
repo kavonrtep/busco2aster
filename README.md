@@ -15,8 +15,10 @@ Given one genome assembly per taxon, the workflow:
 7. aligns loci with batched MAFFT jobs
 8. infers gene trees with IQ-TREE 3 directory mode
 9. infers an unrooted species tree with ASTER `wastral`
-10. computes concordance metrics on the final species tree
-11. renders final Markdown and HTML reports
+10. computes concordance metrics on the final species tree (gCF, sCF, wASTRAL quartet posteriors)
+11. identifies contested branches and generates alternative topology hypotheses
+12. tests whether alternative topologies can be statistically rejected with the IQ-TREE AU test
+13. renders final Markdown and HTML reports
 
 Current v1 defaults in [config/config.yaml](/home/petr/PycharmProjects/get_phylo/config/config.yaml):
 
@@ -26,6 +28,8 @@ Current v1 defaults in [config/config.yaml](/home/petr/PycharmProjects/get_phylo
 - gene-tree support mode: `abayes`
 - species-tree backend: `wastral`
 - default thread budget in config: `4`
+- topology test threshold: `0.95` (branches with pp1 below this are contested)
+- AU test replicates: `10000`
 
 ## Repository Layout
 
@@ -118,6 +122,7 @@ snakemake --use-conda --conda-frontend conda --cores 4 results/loci/alignments.c
 snakemake --cores 4 results/gene_trees/gene_trees.complete
 snakemake --cores 4 results/species_tree/species_tree.complete
 snakemake --cores 4 results/concordance/gcf.complete results/concordance/scfl.complete results/concordance/wastral_quartets.complete
+snakemake --cores 4 results/topology_tests/topology_tests.complete
 snakemake --use-conda --conda-frontend conda --cores 4 results/report/report.html
 ```
 
@@ -183,10 +188,57 @@ Key outputs are:
 - `results/gene_trees/gene_trees.raw.tre`
 - `results/species_tree/species_tree.wastral.tre`
 - `results/species_tree/species_tree.wastral.log`
+- `results/topology_tests/branch_quartet_support.tsv`
+- `results/topology_tests/contested_branches.tsv`
+- `results/topology_tests/candidate_trees.tre`
+- `results/topology_tests/candidate_trees_manifest.tsv`
+- `results/topology_tests/supermatrix.phy`
+- `results/topology_tests/au_test_results.tsv`
 - [results/report/report.md](/home/petr/PycharmProjects/get_phylo/results/report/report.md)
 - [results/report/report.html](/home/petr/PycharmProjects/get_phylo/results/report/report.html)
 
-The final species tree is unrooted. The Markdown report is the compact audit summary. The HTML report adds dataset overview plots, a pipeline diagram, a labeled species tree, branch-level concordance panels, conflict summaries, and gene-tree heterogeneity plots.
+The final species tree is unrooted. The Markdown report is the compact audit summary. The HTML report adds dataset overview plots, a pipeline diagram, a labeled species tree, branch-level concordance panels, conflict summaries, gene-tree heterogeneity plots, and a topological uncertainty section (quartet posteriors + AU test results).
+
+## Topology Testing
+
+After the species tree is inferred, the workflow identifies branches where the
+topology is uncertain and formally tests whether alternative topologies can be
+statistically rejected.
+
+**Stage A — Contested branch identification**: wASTRAL is re-run with `-u 2`
+to annotate every internal branch with local posterior probabilities (pp1/pp2/pp3)
+under the multispecies coalescent. Branches with `pp1 < contested_branch_threshold`
+(default `0.95`) are flagged as contested.
+
+**Stage B — Alternative topology generation**: For each contested branch, an NNI
+swap produces one alternative species tree. All 2^k − 1 combinations of swaps are
+generated for k contested branches (capped at `max_contested_branches`, default 4).
+User-supplied hypothesis trees can be appended via `hypothesis_trees` in the config.
+
+**Stage C — AU topology test**: IQ-TREE evaluates each candidate tree on a
+concatenated supermatrix with the approximately unbiased (AU) test. Trees with
+p-AU ≥ 0.05 belong to the 95% confidence set and cannot be statistically rejected.
+
+To skip the extension, set `run_topology_tests: false` in the config. To run
+only the topology test stage:
+
+```bash
+snakemake --cores 4 results/topology_tests/topology_tests.complete
+```
+
+Relevant config keys:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `run_topology_tests` | `true` | Enable/disable the extension |
+| `contested_branch_threshold` | `0.95` | pp1 below which a branch is contested |
+| `max_contested_branches` | `4` | Cap on branches used for NNI combinations |
+| `hypothesis_trees` | `null` | Optional Newick file of additional hypothesis trees |
+| `au_test_replicates` | `10000` | RELL replicates for the AU test |
+| `au_test_model` | `from_gene_trees` | Model for supermatrix partitions; `from_gene_trees` reuses IQ-TREE selected models |
+
+The HTML report includes a **Topological uncertainty** section with a per-branch
+quartet posterior table, an AU test results table, and an interpretation guide.
 
 ## Testing and Development
 

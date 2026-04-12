@@ -36,3 +36,19 @@ threads:
 # iqtree_executable: /absolute/path/to/iqtree3
 # wastral_executable: /absolute/path/to/wastral
 # astral4_executable: /absolute/path/to/astral4
+
+# ── Alternative topology hypothesis testing ───────────────────────────────────
+# Set run_topology_tests: false to skip the extension entirely.
+run_topology_tests: true
+# Branches with pp1 below this threshold are flagged as contested.
+contested_branch_threshold: 0.95
+# Maximum contested branches used for NNI combination generation (2^k - 1 alternatives).
+max_contested_branches: 4
+# Optional Newick file of user-supplied hypothesis trees to add to the candidate set.
+hypothesis_trees: null
+# RELL replicates for the IQ-TREE AU test.
+au_test_replicates: 10000
+# Model for AU-test supermatrix partitions.
+# "from_gene_trees" reuses the model selected during gene-tree inference.
+# Any other value is used as a literal model string (e.g. "MFP" or "LG+G4").
+au_test_model: from_gene_trees

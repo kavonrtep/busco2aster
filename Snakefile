@@ -26,6 +26,7 @@ from scripts.sequence_mode import (
     sequence_length_unit,
 )
 from scripts.species_tree import species_tree_output_paths
+from scripts.topology_tests import topology_tests_output_paths
 
 configfile: "config/config.yaml"
 
@@ -107,6 +108,13 @@ ASTRAL4_OUTPUTS = species_tree_output_paths("astral4")
 GCF_OUTPUTS = concordance_output_paths("gcf")
 SCFL_OUTPUTS = concordance_output_paths("scfl")
 WASTRAL_QUARTET_OUTPUTS = quartet_output_paths()
+TOPOLOGY_TESTS_OUTPUTS = topology_tests_output_paths()
+RUN_TOPOLOGY_TESTS = bool(config.get("run_topology_tests", True))
+CONTESTED_BRANCH_THRESHOLD = float(config.get("contested_branch_threshold", 0.95))
+MAX_CONTESTED_BRANCHES = int(config.get("max_contested_branches", 4))
+AU_TEST_REPLICATES = int(config.get("au_test_replicates", 10000))
+AU_TEST_MODEL = str(config.get("au_test_model", "from_gene_trees"))
+HYPOTHESIS_TREES = config.get("hypothesis_trees", None)
 SPECIES_TREE_COMPLETE = f"{SPECIES_TREE_DIR}/species_tree.complete"
 REPORT_MARKDOWN = "results/report/report.md"
 REPORT_DATA_DIR = "results/report/data"
@@ -162,6 +170,7 @@ include: "workflow/rules/alignment.smk"
 include: "workflow/rules/gene_trees.smk"
 include: "workflow/rules/species_tree.smk"
 include: "workflow/rules/concordance.smk"
+include: "workflow/rules/topology_tests.smk"
 include: "workflow/rules/report.smk"
 include: "workflow/rules/visual_report.smk"
 
@@ -239,6 +248,7 @@ rule all:
             GCF_OUTPUTS["stat"],
             SCFL_OUTPUTS["stat"],
             WASTRAL_QUARTET_OUTPUTS["freqquad"],
+            *([TOPOLOGY_TESTS_OUTPUTS["completion"]] if RUN_TOPOLOGY_TESTS else []),
             REPORT_MARKDOWN,
             REPORT_HTML,
         ]

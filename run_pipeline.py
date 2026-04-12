@@ -30,6 +30,8 @@ SINGLE_JOB_RULES = (
     "annotate_species_tree_quartets",
     "infer_species_tree_wastral",
     "infer_species_tree_astral4",
+    "wastral_u2_annotate",
+    "au_topology_test",
 )
 SHARED_SAMPLE_RULES = ("prepare_assembly", "run_busco")
 

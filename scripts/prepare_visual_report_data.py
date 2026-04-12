@@ -24,11 +24,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--alignment-dir", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--sequence-type", default="protein")
+    parser.add_argument(
+        "--topology-tests-results-dir",
+        default=None,
+        help="Directory containing topology test result TSVs to copy into the report data dir.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    output_dir = Path(args.output_dir)
     build_report_data_bundle(
         repo_root=Path(args.repo_root).resolve(),
         busco_summary_path=Path(args.busco_summary),
@@ -42,9 +48,23 @@ def main() -> int:
         scfl_branch_path=Path(args.scfl_branch),
         quartet_freqquad_path=Path(args.quartet_freqquad),
         alignment_dir=Path(args.alignment_dir),
-        output_dir=Path(args.output_dir),
+        output_dir=output_dir,
         sequence_type=args.sequence_type,
     )
+    if args.topology_tests_results_dir is not None:
+        import shutil
+
+        src_dir = Path(args.topology_tests_results_dir)
+        _TOPOLOGY_REPORT_FILES = [
+            "branch_quartet_support.tsv",
+            "contested_branches.tsv",
+            "candidate_trees_manifest.tsv",
+            "au_test_results.tsv",
+        ]
+        for fname in _TOPOLOGY_REPORT_FILES:
+            src = src_dir / fname
+            if src.is_file():
+                shutil.copy2(src, output_dir / fname)
     return 0
 
 

@@ -28,3 +28,11 @@ threads:
   concordance: 4
   iqtree: 4
   species_tree: 4
+
+# ── Alternative topology hypothesis testing ───────────────────────────────────
+run_topology_tests: true
+contested_branch_threshold: 0.95
+max_contested_branches: 4
+hypothesis_trees: null
+au_test_replicates: 10000
+au_test_model: from_gene_trees

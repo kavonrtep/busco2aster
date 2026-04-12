@@ -312,6 +312,73 @@ support_plot <- gene_heterogeneity %>%
 (rf_plot + topology_plot) / (model_plot + support_plot)
 ```
 
+## Topological uncertainty
+
+```{r}
+#| label: topology-tests-load
+#| include: false
+topo_tests_available <- file.exists(file.path(data_dir, "au_test_results.tsv"))
+if (topo_tests_available) {
+  branch_quartet_support <- read_tsv(file.path(data_dir, "branch_quartet_support.tsv"), show_col_types = FALSE)
+  contested_branches     <- read_tsv(file.path(data_dir, "contested_branches.tsv"), show_col_types = FALSE)
+  au_test_results        <- read_tsv(file.path(data_dir, "au_test_results.tsv"), show_col_types = FALSE)
+  candidate_manifest     <- read_tsv(file.path(data_dir, "candidate_trees_manifest.tsv"), show_col_types = FALSE)
+}
+```
+
+```{r}
+#| label: topology-tests-guard
+#| echo: false
+#| results: asis
+if (!topo_tests_available) {
+  cat("> **Note:** Topology test outputs are not present in this report run. ",
+      "Set `run_topology_tests: true` in the config and re-run to enable this section.\n")
+}
+```
+
+```{r}
+#| label: quartet-posteriors
+#| eval: !expr topo_tests_available
+#| echo: false
+branch_quartet_support %>%
+  mutate(
+    pp1 = round(as.numeric(pp1), 3),
+    pp2 = round(as.numeric(pp2), 3),
+    pp3 = round(as.numeric(pp3), 3),
+    q1  = round(as.numeric(q1),  3),
+    q2  = round(as.numeric(q2),  3),
+    q3  = round(as.numeric(q3),  3),
+    Contested = ifelse(as.logical(contested), "Yes", "")
+  ) %>%
+  select(Branch = branch_id, pp1, pp2, pp3, q1, q2, q3, Contested) %>%
+  kable(caption = "Per-branch quartet posterior probabilities (pp1 = main topology, pp2/pp3 = NNI alternatives). Contested branches (pp1 < threshold) are flagged.")
+```
+
+```{r}
+#| label: au-test-results
+#| eval: !expr topo_tests_available
+#| echo: false
+au_test_results %>%
+  mutate(
+    logL  = round(as.numeric(logL), 2),
+    deltaL = round(as.numeric(deltaL), 2),
+    p_au  = round(as.numeric(p_au), 4),
+    `Confidence set` = ifelse(as.logical(in_confidence_set), "Yes", "No")
+  ) %>%
+  select(
+    `Tree` = tree_index, Description = description, Source = source,
+    logL, deltaL, `p-AU` = p_au, `Confidence set`
+  ) %>%
+  kable(caption = "AU topology test results. Trees with p-AU ≥ 0.05 belong to the 95% confidence set and cannot be rejected.")
+```
+
+> **Interpretation guide**
+>
+> - **Quartet posteriors (pp1–pp3)**: Coalescent-aware per-branch support under the multispecies coalescent. A branch with pp1 > 0.95 is well resolved; pp1 ~ 0.5–0.7 indicates genuine topological ambiguity due to ILS or insufficient data.
+> - **AU p-values**: Concatenation-based topology test. Trees with p-AU ≥ 0.05 cannot be rejected given the total sequence evidence.
+> - **Agreement**: When a contested branch (low pp1) also has an alternative tree in the AU confidence set, both the coalescent and concatenation perspectives agree on the ambiguity — the strongest signal that the branch is genuinely unresolved.
+> - **Disagreement**: Low pp1 but AU rejects the alternative may indicate systematic error (e.g., long-branch attraction) rather than ILS; high pp1 but AU keeps the alternative may indicate ILS that concatenation cannot model.
+
 ## Appendix
 
 ```{r}
