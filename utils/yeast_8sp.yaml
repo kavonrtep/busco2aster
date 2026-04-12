@@ -14,10 +14,15 @@
 samples: test_datasets/yeast_8sp/samples.tsv
 
 # ── BUSCO ─────────────────────────────────────────────────────────────────────
-# fungi_odb10 covers all Dikarya and has only 758 markers (vs 2137 for
-# saccharomycetes_odb10), making test runs ~3x faster while still producing
-# a meaningful tree from the 8 Ascomycota species in this dataset.
-busco_lineage: fungi_odb10
+# eukaryota_odb12 has only 129 markers (OrthoDB v12) — the smallest available
+# lineage, ~18x fewer than saccharomycetes_odb12 (2319). This is intentional
+# for fast test runs: all 8 Ascomycota species here have the core eukaryotic
+# genes, and even at 0.8 occupancy you get enough loci for wASTRAL.
+# Upgrade lineage for more rigorous runs:
+#   fungi_odb10       758 markers
+#   fungi_odb12      1122 markers
+#   saccharomycetes_odb12  2319 markers
+busco_lineage: eukaryota_odb12
 busco_download_path: work/busco_downloads
 
 # ── Assembly prep ─────────────────────────────────────────────────────────────

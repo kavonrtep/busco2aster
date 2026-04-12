@@ -17,8 +17,11 @@ high-quality scaffold assemblies, and span multiple orders of Ascomycota:
   Schizosaccharomycetales (outgroup)
                       └── Schizosaccharomyces pombe 972h-        GCF_000002945.2 ~12.6 Mb
 
-BUSCO lineage: fungi_odb10 (758 single-copy markers).
-Higher-level lineage means fewer BUSCOs and faster test runs than saccharomycetes_odb10 (2137).
+BUSCO lineage: eukaryota_odb12 (129 single-copy markers, OrthoDB v12).
+Smallest available lineage — ~18x fewer BUSCOs than saccharomycetes_odb12 (2319).
+All 8 species carry the core eukaryotic gene set, giving enough loci for wASTRAL
+even at 0.8 occupancy. Upgrade to fungi_odb12 (1122) or saccharomycetes_odb12
+(2319) for more rigorous runs.
 
 Total download: ~95 Mb compressed genomes.
 
