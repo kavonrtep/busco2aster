@@ -1,0 +1,71 @@
+# busco2aster config for the 8-species yeast test dataset.
+#
+# Generate the assembly files and samples.tsv first:
+#   python3 utils/download_yeast_8sp.py
+#
+# Then run the pipeline from the repo root:
+#   python3 run_pipeline.py -c utils/yeast_8sp.yaml --repo-root . --directory . -t 8
+#
+# Or with snakemake directly:
+#   snakemake --use-conda --conda-frontend conda --cores 8 --configfile utils/yeast_8sp.yaml results/report/report.html
+
+# ── Input manifest ────────────────────────────────────────────────────────────
+# Produced by utils/download_yeast_8sp.py (not versioned).
+samples: test_datasets/yeast_8sp/samples.tsv
+
+# ── BUSCO ─────────────────────────────────────────────────────────────────────
+# fungi_odb10 covers all Dikarya and has only 758 markers (vs 2137 for
+# saccharomycetes_odb10), making test runs ~3x faster while still producing
+# a meaningful tree from the 8 Ascomycota species in this dataset.
+busco_lineage: fungi_odb10
+busco_download_path: work/busco_downloads
+
+# ── Assembly prep ─────────────────────────────────────────────────────────────
+assembly_prep_root: work/assemblies_prepared
+assembly_wrap_width: 80
+
+# ── Locus selection ───────────────────────────────────────────────────────────
+# 0.8 requires a locus to be present in at least 7 of 8 taxa.
+# Lower to 0.5 if you want more loci (faster, less strict tree).
+occupancy_threshold: 0.8
+
+# ── Sequence type ─────────────────────────────────────────────────────────────
+sequence_type: protein
+
+# ── Alignment ────────────────────────────────────────────────────────────────
+alignment_tool: mafft
+alignment_batch_size: 200
+trimming_mode: none
+
+# ── Gene trees ────────────────────────────────────────────────────────────────
+gene_tree_tool: iqtree3
+iqtree_model: MFP
+iqtree_support_mode: abayes
+iqtree_seed: 20260327
+iqtree_ufboot_replicates: 1000
+
+# ── Species tree ─────────────────────────────────────────────────────────────
+species_tree_backend: wastral
+
+# ── Concordance ───────────────────────────────────────────────────────────────
+iqtree_scfl_quartets: 100
+iqtree_scfl_model: auto
+
+# ── Topology testing ──────────────────────────────────────────────────────────
+run_topology_tests: true
+contested_branch_threshold: 0.95
+max_contested_branches: 4
+hypothesis_trees: null
+au_test_replicates: 10000
+au_test_model: from_gene_trees
+
+# ── Threading (adjust to your machine) ───────────────────────────────────────
+thread_policy: auto
+threads:
+  default: 4
+  assembly_prep: 4
+  alignment: 1
+  busco: 4
+  concordance: 4
+  iqtree: 8
+  species_tree: 8

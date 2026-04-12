@@ -14,3 +14,6 @@ work/
 .venv/
 busco_downloads/
 *.sif
+
+# Test datasets (downloaded assemblies; scripts in utils/ are versioned, data is not)
+test_datasets/
