@@ -43,25 +43,29 @@ jobs:
 
       - name: Smoke test image
         run: |
-          apptainer exec busco2aster.sif snakemake --version
-          apptainer exec busco2aster.sif bash -lc 'iqtree3 --version'
-          apptainer exec busco2aster.sif bash -lc 'wastral -h >/dev/null'
-          apptainer exec busco2aster.sif python3 /opt/pipeline/run_pipeline.py --help >/dev/null
-          apptainer exec busco2aster.sif snakemake \
+          # Snakemake writes a source cache under XDG_CACHE_HOME (defaults to
+          # $HOME/.cache).  Inside the read-only SIF $HOME is /root, so point
+          # the cache to a writable tmpfs instead.
+          export SMK="apptainer exec --env XDG_CACHE_HOME=/tmp busco2aster.sif"
+          $SMK snakemake --version
+          $SMK bash -lc 'iqtree3 --version'
+          $SMK bash -lc 'wastral -h >/dev/null'
+          $SMK python3 /opt/pipeline/run_pipeline.py --help >/dev/null
+          $SMK snakemake \
             --snakefile /opt/pipeline/workflow/Snakefile_create_envs \
             --use-conda \
             --conda-prefix /opt/conda/envs \
             --conda-frontend conda \
             --cores 1 \
             /tmp/busco2aster_env_assembly_prep
-          apptainer exec busco2aster.sif snakemake \
+          $SMK snakemake \
             --snakefile /opt/pipeline/workflow/Snakefile_create_envs \
             --use-conda \
             --conda-prefix /opt/conda/envs \
             --conda-frontend conda \
             --cores 1 \
             /tmp/busco2aster_env_dna_extract
-          apptainer exec busco2aster.sif snakemake \
+          $SMK snakemake \
             --snakefile /opt/pipeline/workflow/Snakefile_create_envs \
             --use-conda \
             --conda-prefix /opt/conda/envs \
