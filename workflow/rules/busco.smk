@@ -31,11 +31,31 @@ rule verify_busco_lineage:
         )
 
 
+rule fetch_busco_lineage:
+    """Pre-download the configured BUSCO lineage once so parallel run_busco jobs don't race the same tarball."""
+    input:
+        verified=ancient(BUSCO_LINEAGE_VERIFIED),
+    output:
+        dataset_cfg=BUSCO_LINEAGE_DATASET_CFG,
+    params:
+        lineage=BUSCO_LINEAGE,
+        download_path=BUSCO_DOWNLOAD_PATH,
+    conda:
+        "../envs/busco.yaml"
+    shell:
+        r"""
+        mkdir -p {params.download_path:q}
+        busco --download {params.lineage:q} --download_path {params.download_path:q}
+        test -f {output.dataset_cfg:q}
+        """
+
+
 rule run_busco:
     input:
         assembly=ASSEMBLY_PREPARED_PATTERN,
         validated=ancient(VALIDATED_MANIFEST),
         lineage=ancient(BUSCO_LINEAGE_VERIFIED),
+        lineage_dataset=ancient(BUSCO_LINEAGE_DATASET_CFG),
     output:
         command="results/busco/{sample}/command.sh",
         paths="results/busco/{sample}/paths.tsv",
