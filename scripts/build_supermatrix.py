@@ -5,6 +5,8 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+from .alignment import load_retained_locus_ids
+
 
 def _read_fasta(path: Path) -> dict[str, str]:
     """Return an ordered dict of {taxon_label: sequence} from a FASTA file."""
@@ -37,16 +39,6 @@ def _load_gene_tree_manifest(path: Path) -> dict[str, str]:
     return model_map
 
 
-def _load_retained_locus_ids(path: Path) -> list[str]:
-    """Return ordered list of retained locus IDs from retained_loci.tsv."""
-    locus_ids: list[str] = []
-    with path.open(newline="", encoding="utf-8") as handle:
-        reader = csv.DictReader(handle, delimiter="\t")
-        for row in reader:
-            locus_ids.append(row["locus_id"])
-    return locus_ids
-
-
 def build_supermatrix(
     *,
     alignment_dir: Path,
@@ -61,7 +53,7 @@ def build_supermatrix(
 
     Missing taxa in any locus are gap-padded to the full locus length.
     """
-    locus_ids = _load_retained_locus_ids(retained_loci_path)
+    locus_ids = load_retained_locus_ids(retained_loci_path)
     model_map = _load_gene_tree_manifest(gene_tree_manifest_path)
 
     # Collect all taxon labels across all loci (preserving first-seen order).
