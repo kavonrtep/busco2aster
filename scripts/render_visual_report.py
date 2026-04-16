@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -24,41 +25,44 @@ def main() -> int:
     output_path = Path(args.output).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    command = [
-        args.quarto_executable,
-        "render",
-        qmd_path.as_posix(),
-        "--to",
-        "html",
-        "--output",
-        output_path.name,
-        "-P",
-        f"data_dir:{data_dir.as_posix()}",
-    ]
-    subprocess.run(command, check=True, cwd=output_path.parent)
+    # Quarto writes scratch files (and may rewrite the source .qmd) next to
+    # the input. Inside the Apptainer image the pipeline tree is read-only,
+    # so render from a writable scratch copy instead.
+    with tempfile.TemporaryDirectory(prefix="quarto_render_", dir=output_path.parent) as tmpdir:
+        scratch = Path(tmpdir)
+        scratch_qmd = scratch / qmd_path.name
+        shutil.copy2(qmd_path, scratch_qmd)
 
-    source_sidecar = qmd_path.parent / f"{qmd_path.stem}_files"
-    target_sidecar = output_path.parent / f"{output_path.stem}_files"
-    if source_sidecar.is_dir():
-        if target_sidecar.exists():
-            shutil.rmtree(target_sidecar)
-        shutil.copytree(source_sidecar, target_sidecar)
-        if source_sidecar.resolve() != target_sidecar.resolve():
-            shutil.rmtree(source_sidecar)
+        command = [
+            args.quarto_executable,
+            "render",
+            scratch_qmd.name,
+            "--to",
+            "html",
+            "--output",
+            output_path.name,
+            "-P",
+            f"data_dir:{data_dir.as_posix()}",
+        ]
+        subprocess.run(command, check=True, cwd=scratch)
 
-    if output_path.is_file():
-        return 0
+        source_sidecar = scratch / f"{scratch_qmd.stem}_files"
+        target_sidecar = output_path.parent / f"{output_path.stem}_files"
+        if source_sidecar.is_dir():
+            if target_sidecar.exists():
+                shutil.rmtree(target_sidecar)
+            shutil.move(source_sidecar.as_posix(), target_sidecar.as_posix())
 
-    fallback_candidates = [
-        output_path.parent / output_path.name,
-        output_path.parent.parent / output_path.name,
-        qmd_path.parent / output_path.name,
-    ]
-    for candidate in fallback_candidates:
-        if candidate.is_file():
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            if candidate.resolve() != output_path:
-                shutil.move(candidate.as_posix(), output_path.as_posix())
+        rendered_html = scratch / output_path.name
+        if rendered_html.is_file():
+            shutil.move(rendered_html.as_posix(), output_path.as_posix())
+            return 0
+
+        # Fallback: some Quarto versions emit into the working directory with
+        # the stem matching the input filename rather than --output.
+        fallback = scratch / f"{scratch_qmd.stem}.html"
+        if fallback.is_file():
+            shutil.move(fallback.as_posix(), output_path.as_posix())
             return 0
 
     raise FileNotFoundError(f"Quarto render completed but output was not found at {output_path}.")
