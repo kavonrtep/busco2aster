@@ -297,6 +297,50 @@ Tree      logL    deltaL
 deltaL  : logL difference from the maximal logl in the set.
 """
 
+    _IQTREE_DEFAULT_COLUMNS_CONTENT = """
+USER TREES
+----------
+
+See results/topology_tests/au_test.trees for trees with branch lengths.
+
+Tree      logL    deltaL  bp-RELL    p-KH     p-SH       c-ELW       p-AU
+-------------------------------------------------------------------------
+  1 -517124.1069   30.96  0.0453 - 0.0467 - 0.0467 -    0.0468 -   0.0464 -
+  2 -517093.1464       0   0.955 +  0.953 +      1 +     0.953 +        1 +
+
+deltaL  : logL difference from the maximal logl in the set.
+bp-RELL : bootstrap proportion using RELL method (Kishino et al. 1990).
+p-KH    : p-value of one sided Kishino-Hasegawa test (1989).
+
+CONSENSUS TREE
+--------------
+
+The consensus tree text would normally appear here.
+"""
+
+    def test_parse_au_test_default_flags_5_signed_columns(self):
+        """Without --test-weight, IQ-TREE omits p-WKH/p-WSH; columns must align."""
+        with TemporaryDirectory() as tmpdir:
+            iqtree_path = Path(tmpdir) / "au_test.iqtree"
+            iqtree_path.write_text(self._IQTREE_DEFAULT_COLUMNS_CONTENT, encoding="utf-8")
+            rows = parse_au_test_iqtree(iqtree_path)
+        self.assertEqual(len(rows), 2)
+        # Tree 2 is the better topology (deltaL=0); p-AU should map to p_au, not p_wsh.
+        self.assertAlmostEqual(rows[1]["p_au"], 1.0)
+        self.assertAlmostEqual(rows[1]["c_elw"], 0.953)
+        self.assertIsNone(rows[1]["p_wkh"])
+        self.assertIsNone(rows[1]["p_wsh"])
+        # Tree 1 should not be in the confidence set (p_au=0.0464 < 0.05).
+        self.assertAlmostEqual(rows[0]["p_au"], 0.0464)
+
+    def test_parse_au_test_does_not_include_later_section_dashes(self):
+        """sep-line scan must not bleed into FOOTNOTES/CONSENSUS sections."""
+        with TemporaryDirectory() as tmpdir:
+            iqtree_path = Path(tmpdir) / "au_test.iqtree"
+            iqtree_path.write_text(self._IQTREE_DEFAULT_COLUMNS_CONTENT, encoding="utf-8")
+            rows = parse_au_test_iqtree(iqtree_path)
+        self.assertEqual([r["tree_index"] for r in rows], [1, 2])
+
     def test_parse_au_test_handles_single_tree_simplified_table(self):
         """When only one candidate tree is present, IQ-TREE omits AU columns."""
         with TemporaryDirectory() as tmpdir:

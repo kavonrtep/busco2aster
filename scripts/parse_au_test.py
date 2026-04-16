@@ -18,8 +18,20 @@ _USER_TREES_ROW_RE = re.compile(
     r"(?P<rest>(?:\s+[0-9.]+\s+[+-].*)?)\s*$"
 )
 
-# Names for the sign-marked columns (in order as they appear in the table).
-_SIGNED_COLUMNS = ["bp_rell", "p_kh", "p_sh", "p_wkh", "p_wsh", "c_elw", "p_au"]
+# Mapping from IQ-TREE column header tokens to our normalised TSV column names.
+# Which signed columns are emitted depends on the test flags: a default
+# `--test-au` run emits bp-RELL, p-KH, p-SH, c-ELW, p-AU; adding `--test-weight`
+# inserts p-WKH and p-WSH between p-SH and c-ELW.
+_HEADER_TOKEN_TO_COLUMN = {
+    "bp-RELL": "bp_rell",
+    "p-KH": "p_kh",
+    "p-SH": "p_sh",
+    "p-WKH": "p_wkh",
+    "p-WSH": "p_wsh",
+    "c-ELW": "c_elw",
+    "p-AU": "p_au",
+}
+_ALL_SIGNED_COLUMNS = list(_HEADER_TOKEN_TO_COLUMN.values())
 
 AU_RESULTS_COLUMNS = [
     "tree_index",
@@ -38,23 +50,33 @@ AU_RESULTS_COLUMNS = [
 ]
 
 
-def _parse_rest_columns(rest: str) -> dict[str, str | None]:
+def _parse_signed_columns_header(header_line: str) -> list[str]:
+    """Map column header tokens after deltaL onto our TSV column names."""
+    tokens = header_line.split()
+    try:
+        delta_idx = tokens.index("deltaL")
+    except ValueError as exc:
+        raise ValueError(f"deltaL not in column header: {header_line!r}") from exc
+    return [
+        _HEADER_TOKEN_TO_COLUMN[t]
+        for t in tokens[delta_idx + 1:]
+        if t in _HEADER_TOKEN_TO_COLUMN
+    ]
+
+
+def _parse_rest_columns(rest: str, signed_columns: list[str]) -> dict[str, str | None]:
     """Parse alternating value/sign tokens from the right portion of a table row.
 
-    Returns None for any column that is absent (as happens when only one
-    candidate tree is tested, because IQ-TREE omits the AU-family columns).
+    Columns absent from the table (e.g. p-WKH/p-WSH when --test-weight is off)
+    are returned as None.
     """
     tokens = rest.split()
-    result: dict[str, str | None] = {col: None for col in _SIGNED_COLUMNS}
-    col_iter = iter(_SIGNED_COLUMNS)
-    i = 0
-    while i < len(tokens):
-        try:
-            col = next(col_iter)
-        except StopIteration:
+    result: dict[str, str | None] = {col: None for col in _ALL_SIGNED_COLUMNS}
+    for i, col in enumerate(signed_columns):
+        token_idx = 2 * i  # value, sign, value, sign, ...
+        if token_idx >= len(tokens):
             break
-        result[col] = tokens[i]
-        i += 2  # skip the +/- sign token
+        result[col] = tokens[token_idx]
     return result
 
 
@@ -70,18 +92,30 @@ def parse_au_test_iqtree(iqtree_path: Path) -> list[dict]:
     if header_idx is None:
         raise ValueError(f"USER TREES section not found in {iqtree_path}")
 
-    # Find the column separator line (row of dashes) after the header.
-    # The column header is between the first separator (after "USER TREES")
-    # and the second separator, which precedes the data rows.
-    sep_indices = [
-        i for i in range(header_idx, len(lines))
-        if re.match(r"^[-]+$", lines[i].strip()) and lines[i].strip()
-    ]
-    if len(sep_indices) < 1:
-        raise ValueError(f"Could not find column separator in USER TREES section of {iqtree_path}")
-
-    # Data rows start after the last separator found in the section.
-    data_start = sep_indices[-1] + 1
+    # Locate the column-header separator (a row of dashes immediately under
+    # the "Tree  logL  deltaL ..." column header). Limit the search to the
+    # USER TREES section itself — later sections (footnotes, model report)
+    # also use dash separators and would otherwise be matched.
+    column_header_idx = next(
+        (
+            i for i in range(header_idx + 1, len(lines))
+            if lines[i].lstrip().startswith("Tree") and "logL" in lines[i]
+        ),
+        None,
+    )
+    if column_header_idx is None:
+        raise ValueError(
+            f"Could not find 'Tree  logL  deltaL' column header in USER TREES "
+            f"section of {iqtree_path}"
+        )
+    if column_header_idx + 1 >= len(lines) or not re.fullmatch(
+        r"-+", lines[column_header_idx + 1].strip()
+    ):
+        raise ValueError(
+            f"Expected dash separator under column header in {iqtree_path}"
+        )
+    signed_columns = _parse_signed_columns_header(lines[column_header_idx])
+    data_start = column_header_idx + 2
 
     rows: list[dict] = []
     for line in lines[data_start:]:
@@ -91,7 +125,7 @@ def parse_au_test_iqtree(iqtree_path: Path) -> list[dict]:
             if rows and not line.strip():
                 break
             continue
-        cols = _parse_rest_columns(m.group("rest"))
+        cols = _parse_rest_columns(m.group("rest"), signed_columns)
         row = {
             "tree_index": int(m.group("index")),
             "logL": float(m.group("logL")),
