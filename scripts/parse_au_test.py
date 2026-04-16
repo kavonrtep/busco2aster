@@ -7,14 +7,15 @@ import re
 from pathlib import Path
 
 # Matches one data row in the USER TREES table.
-# Format: index logL deltaL value sign [value sign ...]
-# The p-AU column is always last.
+# Format: index logL deltaL [value sign [value sign ...]]
+# With >=2 candidate trees IQ-TREE emits bp-RELL, p-KH, p-SH, p-WKH, p-WSH,
+# c-ELW, p-AU — each a value plus "+"/"-" sign. With a single candidate tree
+# those columns are omitted and only index/logL/deltaL are printed.
 _USER_TREES_ROW_RE = re.compile(
     r"^\s*(?P<index>\d+)"
     r"\s+(?P<logL>-?[0-9]+(?:\.[0-9]+)?)"
     r"\s+(?P<deltaL>[0-9]+(?:\.[0-9]+)?)"
-    # remaining pairs of (value, sign) for bp-RELL, p-KH, p-SH, p-WKH, p-WSH, c-ELW, p-AU
-    r"(?P<rest>\s+[0-9.]+\s+[+-].*)"
+    r"(?P<rest>(?:\s+[0-9.]+\s+[+-].*)?)\s*$"
 )
 
 # Names for the sign-marked columns (in order as they appear in the table).
@@ -37,18 +38,20 @@ AU_RESULTS_COLUMNS = [
 ]
 
 
-def _parse_rest_columns(rest: str) -> dict[str, str]:
-    """Parse alternating value/sign tokens from the right portion of a table row."""
+def _parse_rest_columns(rest: str) -> dict[str, str | None]:
+    """Parse alternating value/sign tokens from the right portion of a table row.
+
+    Returns None for any column that is absent (as happens when only one
+    candidate tree is tested, because IQ-TREE omits the AU-family columns).
+    """
     tokens = rest.split()
-    result: dict[str, str] = {}
+    result: dict[str, str | None] = {col: None for col in _SIGNED_COLUMNS}
     col_iter = iter(_SIGNED_COLUMNS)
     i = 0
-    while i < len(tokens) and True:
+    while i < len(tokens):
         try:
             col = next(col_iter)
         except StopIteration:
-            break
-        if i >= len(tokens):
             break
         result[col] = tokens[i]
         i += 2  # skip the +/- sign token
@@ -93,7 +96,7 @@ def parse_au_test_iqtree(iqtree_path: Path) -> list[dict]:
             "tree_index": int(m.group("index")),
             "logL": float(m.group("logL")),
             "deltaL": float(m.group("deltaL")),
-            **{k: float(v) for k, v in cols.items()},
+            **{k: (float(v) if v is not None else None) for k, v in cols.items()},
         }
         rows.append(row)
 
@@ -119,7 +122,9 @@ def join_with_manifest(
         idx = row["tree_index"]
         meta = manifest.get(idx, {})
         p_au = row.get("p_au")
-        in_cs = (p_au is not None and p_au >= 0.05)
+        # Single-candidate runs omit p-AU entirely; the lone tree is
+        # vacuously in the confidence set.
+        in_cs = True if p_au is None else p_au >= 0.05
         result.append(
             {
                 "tree_index": idx,

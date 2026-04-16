@@ -15,20 +15,16 @@ from scripts.tree_utils import (
     read_newick,
 )
 
-# Matches wASTRAL -u 2 annotation embedded in node labels.
-# Example: [q1=0.9000;q2=0.0700;q3=0.0300;pp1=0.9670;pp2=0.0210;pp3=0.0120;...]
-# Separators may be semicolons or commas; values may be quoted or unquoted.
-_ANNOTATION_RE = re.compile(
-    r"\[.*?"
-    r"q1=(?P<q1>[0-9.eE+\-]+)[;,\s]+"
-    r"q2=(?P<q2>[0-9.eE+\-]+)[;,\s]+"
-    r"q3=(?P<q3>[0-9.eE+\-]+)[;,\s]+"
-    r"pp1=(?P<pp1>[0-9.eE+\-]+)[;,\s]+"
-    r"pp2=(?P<pp2>[0-9.eE+\-]+)[;,\s]+"
-    r"pp3=(?P<pp3>[0-9.eE+\-]+)"
-    r".*?\]",
-    re.DOTALL,
-)
+# Matches the full wASTRAL -u 2 bracketed annotation block. wASTRAL emits
+# keys like CULength, f1..f3, localPP, pp1..pp3, q1..q3 in a non-deterministic
+# order across releases (observed: pp* before q* in wASTRAL 1.19+), so we
+# capture the bracketed span and then extract each key independently.
+_ANNOTATION_BLOCK_RE = re.compile(r"\[[^\[\]]*\]", re.DOTALL)
+_NUMBER_PATTERN = r"[0-9.eE+\-]+"
+_KEY_PATTERNS = {
+    key: re.compile(rf"(?:^|[;,\s\[]){re.escape(key)}=({_NUMBER_PATTERN})")
+    for key in ("q1", "q2", "q3", "pp1", "pp2", "pp3")
+}
 
 BRANCH_QUARTET_SUPPORT_COLUMNS = [
     "branch_id",
@@ -49,17 +45,17 @@ CONTESTED_BRANCHES_COLUMNS = BRANCH_QUARTET_SUPPORT_COLUMNS
 def _parse_annotation(label: str | None) -> dict[str, float] | None:
     if label is None:
         return None
-    m = _ANNOTATION_RE.search(label)
-    if m is None:
+    block_match = _ANNOTATION_BLOCK_RE.search(label)
+    if block_match is None:
         return None
-    return {
-        "q1": float(m.group("q1")),
-        "q2": float(m.group("q2")),
-        "q3": float(m.group("q3")),
-        "pp1": float(m.group("pp1")),
-        "pp2": float(m.group("pp2")),
-        "pp3": float(m.group("pp3")),
-    }
+    block = block_match.group(0)
+    parsed: dict[str, float] = {}
+    for key, pattern in _KEY_PATTERNS.items():
+        m = pattern.search(block)
+        if m is None:
+            return None
+        parsed[key] = float(m.group(1))
+    return parsed
 
 
 def parse_wastral_u2_tree(

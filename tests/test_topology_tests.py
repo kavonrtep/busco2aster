@@ -109,6 +109,22 @@ class QuartetSupportParserTests(unittest.TestCase):
         self.assertAlmostEqual(row["pp1"], 0.95)
         self.assertAlmostEqual(row["q1"], 0.9)
 
+    def test_parse_handles_real_wastral_u2_field_order(self):
+        """wASTRAL 1.19+ emits pp* before q* and prefixes CULength/f1-f3/localPP."""
+        newick = (
+            "((A,B)'[CULength=0.5;f1=90;f2=7;f3=3;localPP=0.95;"
+            "pp1=0.95;pp2=0.03;pp3=0.02;q1=0.9;q2=0.07;q3=0.03]':0.5,"
+            "(C,D):0.2):0.0;"
+        )
+        with TemporaryDirectory() as tmpdir:
+            p = Path(tmpdir) / "u2.tre"
+            p.write_text(newick, encoding="utf-8")
+            rows = parse_wastral_u2_tree(p, contested_threshold=0.99)
+        self.assertEqual(len(rows), 1)
+        self.assertAlmostEqual(rows[0]["pp1"], 0.95)
+        self.assertAlmostEqual(rows[0]["q1"], 0.9)
+        self.assertTrue(rows[0]["contested"])  # pp1=0.95 < 0.99
+
     def test_parse_flags_contested_branch(self):
         newick = (
             "((A,B)'[q1=0.4;q2=0.35;q3=0.25;pp1=0.41;pp2=0.37;pp3=0.22]':0.5,"
@@ -267,6 +283,42 @@ deltaL  : logL difference from the best tree
         self.assertAlmostEqual(rows[0]["logL"], -12345.67)
         self.assertAlmostEqual(rows[0]["deltaL"], 0.0)
         self.assertAlmostEqual(rows[1]["deltaL"], 43.45)
+
+    _IQTREE_SINGLE_TREE_CONTENT = """
+USER TREES
+----------
+
+See results/topology_tests/au_test.trees for trees with branch lengths.
+
+Tree      logL    deltaL
+-------------------------
+  1 -517124.1058       0
+
+deltaL  : logL difference from the maximal logl in the set.
+"""
+
+    def test_parse_au_test_handles_single_tree_simplified_table(self):
+        """When only one candidate tree is present, IQ-TREE omits AU columns."""
+        with TemporaryDirectory() as tmpdir:
+            iqtree_path = Path(tmpdir) / "au_test.iqtree"
+            iqtree_path.write_text(self._IQTREE_SINGLE_TREE_CONTENT, encoding="utf-8")
+            rows = parse_au_test_iqtree(iqtree_path)
+            manifest_path = Path(tmpdir) / "manifest.tsv"
+            manifest_path.write_text(
+                "tree_index\tdescription\tsource\n"
+                "1\twASTRAL best tree\toriginal\n",
+                encoding="utf-8",
+            )
+            joined = join_with_manifest(rows, manifest_path)
+            out = Path(tmpdir) / "au_results.tsv"
+            write_au_results(joined, out)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["tree_index"], 1)
+        self.assertAlmostEqual(rows[0]["logL"], -517124.1058)
+        self.assertIsNone(rows[0]["p_au"])
+        self.assertIsNone(rows[0]["bp_rell"])
+        # Lone tree is vacuously in the confidence set.
+        self.assertTrue(joined[0]["in_confidence_set"])
 
     def test_in_confidence_set_threshold(self):
         with TemporaryDirectory() as tmpdir:
