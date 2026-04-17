@@ -68,17 +68,17 @@ rule render_visual_report:
         gene_tree_heterogeneity=REPORT_GENE_TREE_HETEROGENEITY,
         topology_counts=REPORT_TOPOLOGY_COUNTS,
         species_tree_report=REPORT_SPECIES_TREE,
-        qmd="reports/report.qmd",
+        template="reports/template.html.j2",
     output:
         REPORT_HTML,
     params:
         data_dir=REPORT_DATA_DIR,
-    conda:
-        "../envs/report.yaml"
+        assets_dir="reports/assets",
     shell:
         (
-            "python3 -m scripts.render_visual_report "
-            "--qmd {input.qmd:q} "
+            "python3 -m scripts.render_html_report "
+            "--template {input.template:q} "
             "--data-dir {params.data_dir:q} "
+            "--assets-dir {params.assets_dir:q} "
             "--output {output:q}"
         )
