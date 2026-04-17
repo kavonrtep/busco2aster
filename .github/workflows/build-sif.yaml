@@ -65,13 +65,7 @@ jobs:
             --conda-frontend conda \
             --cores 1 \
             /tmp/busco2aster_env_dna_extract
-          $SMK snakemake \
-            --snakefile /opt/pipeline/workflow/Snakefile_create_envs \
-            --use-conda \
-            --conda-prefix /opt/conda/envs \
-            --conda-frontend conda \
-            --cores 1 \
-            /tmp/busco2aster_env_report
+          $SMK python3 -c "import jinja2; print('jinja2', jinja2.__version__)"
 
       - name: Upload SIF to GitHub Release
         uses: softprops/action-gh-release@v2
