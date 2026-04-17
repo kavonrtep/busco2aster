@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>busco2aster Visual Report</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #2563eb;
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --surface: #f9fafb;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  margin: 0;
+  padding: 0;
+  line-height: 1.6;
+}
+.container { max-width: 1400px; margin: 0 auto; padding: 0 2rem; }
+header {
+  background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+  color: white;
+  padding: 2rem 0;
+  margin-bottom: 2rem;
+}
+header h1 { margin: 0 0 0.25rem 0; font-size: 1.75rem; font-weight: 600; }
+header p { margin: 0; opacity: 0.85; font-size: 0.95rem; }
+nav#toc {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  z-index: 100;
+  padding: 0.5rem 0;
+}
+nav#toc .container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+}
+nav#toc a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+nav#toc a:hover { text-decoration: underline; }
+section { margin-bottom: 3rem; }
+h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 0.4rem;
+  margin-top: 2rem;
+}
+h3 { font-size: 1.1rem; font-weight: 600; margin-top: 1.5rem; }
+.caption {
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+.chart-container { width: 100%; margin-bottom: 0.5rem; }
+.chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+@media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+.table-wrapper {
+  overflow-x: auto;
+  margin: 1rem 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  min-width: 600px;
+}
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  border-bottom: 2px solid var(--border);
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+}
+tbody td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+tbody tr:hover { background: var(--surface); }
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.summary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+.summary-card .value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+.summary-card .label {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+.info-box {
+  background: #eff6ff;
+  border-left: 4px solid var(--accent);
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.9rem;
+}
+.warn-box {
+  background: #fffbeb;
+  border-left: 4px solid var(--warning);
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.9rem;
+}
+details {
+  margin: 1rem 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+details summary {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  background: var(--surface);
+  border-radius: 6px;
+}
+details[open] summary { border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; }
+details .content { padding: 1rem; }
+.toggle-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 0.4rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin: 0.5rem 0.25rem 0.5rem 0;
+}
+.toggle-btn:hover { opacity: 0.9; }
+.toggle-btn.active { background: #1d4ed8; }
+#tree-container { width: 100%; min-height: 400px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+#tree-container svg { width: 100%; }
+.pipeline-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.pipeline-step {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.pipeline-arrow { color: var(--muted); font-size: 1.2rem; }
+footer {
+  border-top: 1px solid var(--border);
+  padding: 1.5rem 0;
+  margin-top: 3rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+dl.glossary dt { font-weight: 600; margin-top: 0.75rem; }
+dl.glossary dd { margin-left: 1.5rem; margin-bottom: 0.5rem; }
+@media print {
+  nav#toc, .toggle-btn { display: none; }
+  body { font-size: 10pt; }
+  .chart-row { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <h1>busco2aster Visual Report</h1>
+    <p>Phylogenomic analysis: {{ summary.sample_count }} taxa &middot; {{ summary.retained_loci }} loci &middot; {{ summary.sequence_type }} sequences</p>
+  </div>
+</header>
+
+<nav id="toc">
+  <div class="container">
+    <a href="#summary">Summary</a>
+    <a href="#pipeline">Pipeline</a>
+    <a href="#dataset-qc">Dataset QC</a>
+    <a href="#species-tree">Species Tree</a>
+    <a href="#branch-support">Branch Support</a>
+    <a href="#conflict">Conflict</a>
+    <a href="#heterogeneity">Gene-tree Heterogeneity</a>
+    {% if topo_tests_available %}<a href="#topology-tests">Topology Tests</a>{% endif %}
+    <a href="#glossary">Glossary</a>
+  </div>
+</nav>
+
+<main class="container">
+
+<!-- ═══════════════════════ EXECUTIVE SUMMARY ═══════════════════════ -->
+<section id="summary">
+<h2>Executive Summary</h2>
+<div class="summary-grid">
+  <div class="summary-card">
+    <div class="value">{{ summary.sample_count }}</div>
+    <div class="label">Taxa analyzed</div>
+  </div>
+  <div class="summary-card">
+    <div class="value">{{ summary.retained_loci }}</div>
+    <div class="label">Retained loci (of {{ summary.candidate_loci }} candidates)</div>
+  </div>
+  <div class="summary-card">
+    <div class="value">{{ summary.sequence_type }}</div>
+    <div class="label">Sequence type</div>
+  </div>
+  <div class="summary-card">
+    <div class="value">{{ "%.0f"|format(summary.mean_alignment_length_sites) }} {{ summary.sequence_length_unit }}</div>
+    <div class="label">Mean alignment length</div>
+  </div>
+  <div class="summary-card">
+    <div class="value">{{ summary.complete_taxon_gene_tree_count }}</div>
+    <div class="label">Complete-taxon gene trees (of {{ summary.gene_tree_count }} total)</div>
+  </div>
+  <div class="summary-card">
+    <div class="value">{{ "%.1f"|format(summary.mean_retained_missing_fraction * 100) }}%</div>
+    <div class="label">Mean locus missingness</div>
+  </div>
+</div>
+<p class="caption">
+  <strong>Retained loci</strong> are BUSCO single-copy orthologs present in at least
+  the occupancy threshold fraction of taxa. <strong>Complete-taxon gene trees</strong>
+  contain all {{ summary.sample_count }} taxa, enabling direct topology comparisons.
+  <strong>Missingness</strong> is the average fraction of retained loci absent per taxon.
+</p>
+</section>
+
+<!-- ═══════════════════════ PIPELINE OVERVIEW ═══════════════════════ -->
+<section id="pipeline">
+<h2>Pipeline Overview</h2>
+<div class="pipeline-flow">
+  <div class="pipeline-step">Genome assemblies</div>
+  <div class="pipeline-arrow">&rarr;</div>
+  <div class="pipeline-step">BUSCO orthologs</div>
+  <div class="pipeline-arrow">&rarr;</div>
+  <div class="pipeline-step">MAFFT alignment</div>
+  <div class="pipeline-arrow">&rarr;</div>
+  <div class="pipeline-step">IQ-TREE gene trees</div>
+  <div class="pipeline-arrow">&rarr;</div>
+  <div class="pipeline-step">wASTRAL species tree</div>
+  <div class="pipeline-arrow">&rarr;</div>
+  <div class="pipeline-step">Concordance (gCF/sCF)</div>
+  <div class="pipeline-arrow">&rarr;</div>
+  <div class="pipeline-step">Report</div>
+</div>
+<p class="caption">
+  The pipeline identifies shared single-copy orthologs via BUSCO, aligns them with MAFFT,
+  infers per-locus gene trees with IQ-TREE 3, and summarizes them into a coalescent species
+  tree using wASTRAL. Branch support is assessed via gene concordance factors (gCF),
+  site concordance factors (sCF), and ASTER quartet posteriors.
+</p>
+</section>
+
+<!-- ═══════════════════════ DATASET QC ═══════════════════════ -->
+<section id="dataset-qc">
+<h2>Dataset Quality Control</h2>
+
+<h3>BUSCO Completeness</h3>
+<div class="chart-container" id="chart-busco"></div>
+<p class="caption">
+  <strong>BUSCO completeness</strong> measures how many of the expected universal single-copy
+  orthologs are found in each genome assembly. The x-axis shows the percentage of BUSCO genes
+  in each category: <em>single-copy</em> (ideal &mdash; one copy found), <em>multi-copy</em>
+  (duplicated), <em>fragmented</em> (partial match), and <em>missing</em> (not found).
+  Assemblies with &gt;90% single-copy are considered high quality for phylogenomics.
+</p>
+
+<h3>Retained-locus Missingness</h3>
+<div class="chart-container" id="chart-missingness"></div>
+<p class="caption">
+  For each taxon, this shows what fraction of the retained loci are <em>present</em> (the taxon
+  contributed a sequence) versus <em>missing</em> (the locus was absent or excluded for that taxon).
+  High missingness for a single taxon can reduce phylogenetic resolution and introduce bias.
+</p>
+
+<div class="chart-row">
+  <div>
+    <h3>Alignment Length Distribution</h3>
+    <div class="chart-container" id="chart-alignment"></div>
+    <p class="caption">
+      Distribution of alignment lengths across all retained loci.
+      The x-axis shows alignment length in {{ summary.sequence_length_unit }}
+      ({{ "amino acids" if summary.sequence_type == "protein" else "nucleotides" }});
+      the y-axis shows the number of loci. Very short alignments may lack
+      phylogenetic signal; very long ones may contain non-orthologous regions.
+    </p>
+  </div>
+  <div>
+    <h3>Locus Filtering Outcomes</h3>
+    <div class="chart-container" id="chart-filtering"></div>
+    <p class="caption">
+      Reasons why candidate loci were excluded from the analysis.
+      <em>low_occupancy</em> means the locus was present in too few taxa (below the
+      occupancy threshold). Other reasons may include sequence quality issues.
+      {{ summary.retained_loci }} of {{ summary.candidate_loci }} candidate loci were retained.
+    </p>
+  </div>
+</div>
+</section>
+
+<!-- ═══════════════════════ SPECIES TREE ═══════════════════════ -->
+<section id="species-tree">
+<h2>Species Tree</h2>
+<p>
+  The species tree was inferred by wASTRAL under the multispecies coalescent model.
+  Internal branches are labeled <strong>B1, B2, ...</strong> &mdash; these labels are used
+  as join keys in the concordance and conflict tables below. Tip labels show the full
+  taxon names. Use the buttons to switch between cladogram (equal branch lengths, emphasizing
+  topology) and phylogram (branch lengths proportional to coalescent units) views.
+</p>
+<div>
+  <button class="toggle-btn active" id="btn-cladogram" onclick="setTreeLayout('cladogram')">Cladogram</button>
+  <button class="toggle-btn" id="btn-phylogram" onclick="setTreeLayout('phylogram')">Phylogram</button>
+</div>
+<div id="tree-container"></div>
+</section>
+
+<!-- ═══════════════════════ BRANCH SUPPORT ═══════════════════════ -->
+<section id="branch-support">
+<h2>Branch Support &amp; Concordance</h2>
+
+<div class="info-box">
+  <strong>How to read this section:</strong> Each internal branch of the species tree is
+  assessed by multiple independent support metrics. High values across all metrics indicate
+  a well-resolved branch. Discordance between metrics can reveal incomplete lineage sorting
+  (ILS), hybridization, or model violations. See the <a href="#glossary">Glossary</a> for
+  detailed metric definitions.
+</div>
+
+<div class="chart-container" id="chart-branch-support"></div>
+<p class="caption">
+  Per-branch support metrics plotted side by side. The x-axis shows the score (0&ndash;100%
+  or 0&ndash;100 for concordance factors). Each dot represents one metric for one branch.
+  <strong>ASTER support</strong> is the local posterior probability from wASTRAL;
+  <strong>ASTER q1</strong> is the quartet frequency supporting this topology;
+  <strong>gCF</strong> is the fraction of decisive gene trees concordant with the branch;
+  <strong>sCF</strong> is the fraction of decisive sites concordant. Branches where gCF &lt; 50%
+  or sCF &lt; 50% may be unreliable.
+</p>
+
+<h3>Branch Metrics Table</h3>
+<div class="table-wrapper">
+<table id="table-branch-metrics">
+  <thead>
+    <tr>
+      <th>Branch</th>
+      <th>Split</th>
+      <th>ASTER support (%)</th>
+      <th>ASTER q1 (%)</th>
+      <th>gCF</th>
+      <th>sCF</th>
+      <th>Branch length</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for b in branch_metrics %}
+    <tr>
+      <td><strong>{{ b.label }}</strong></td>
+      <td style="font-size:0.82rem">{{ b.split_left | replace(",", ", ") }}<br><em>vs</em> {{ b.split_right | replace(",", ", ") }}</td>
+      <td>{{ "%.1f"|format(b.aster_local_posterior * 100) }}</td>
+      <td>{{ "%.1f"|format(b.aster_q1 * 100) }}</td>
+      <td>{{ "%.1f"|format(b.gcf) }}</td>
+      <td>{{ "%.1f"|format(b.scfl) }}</td>
+      <td>{{ "%.4f"|format(b.species_tree_branch_length) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="caption">
+  <strong>ASTER support</strong>: local posterior probability that the branch is correct under the
+  multispecies coalescent (values &gt;0.95 are well supported).
+  <strong>ASTER q1</strong>: fraction of input quartet trees that agree with this branch.
+  <strong>gCF</strong>: gene concordance factor &mdash; percentage of decisive gene trees
+  whose topology agrees with this branch (IQ-TREE).
+  <strong>sCF</strong>: site concordance factor &mdash; percentage of decisive alignment sites
+  supporting this branch (IQ-TREE).
+  <strong>Branch length</strong>: in coalescent units (longer = more gene-tree agreement expected).
+</p>
+</section>
+
+<!-- ═══════════════════════ CONFLICT ═══════════════════════ -->
+<section id="conflict">
+<h2>Conflict &amp; Alternative Resolutions</h2>
+
+<p>
+  Every internal branch has two possible alternative topologies (NNI neighbors).
+  The charts below show how gene trees and sites are distributed across the main
+  topology and its two alternatives. In a fully resolved tree, the main topology
+  dominates; when alternatives have substantial support, the branch is genuinely
+  ambiguous.
+</p>
+
+<h3>Gene Concordance Factor Breakdown</h3>
+<div class="chart-container" id="chart-gcf-conflict"></div>
+<p class="caption">
+  For each branch, the stacked bar shows the fraction of decisive gene trees supporting
+  the main topology (<strong>gCF</strong>), the first NNI alternative (<strong>gDF1</strong>),
+  the second alternative (<strong>gDF2</strong>), and those uninformative for this branch
+  (<strong>gDFP</strong>). Bars should sum to ~100%.
+</p>
+
+<h3>Site Concordance Factor Breakdown</h3>
+<div class="chart-container" id="chart-scf-conflict"></div>
+<p class="caption">
+  Analogous to the gene-tree breakdown but at the site level. <strong>sCF</strong> is the
+  fraction of decisive sites supporting the main topology; <strong>sDF1</strong> and
+  <strong>sDF2</strong> support the two alternatives. Under ILS alone, the two alternative
+  fractions should be approximately equal.
+</p>
+
+<h3>ASTER Quartet Alternatives</h3>
+<div class="chart-container" id="chart-aster-conflict"></div>
+<p class="caption">
+  Quartet-based topology frequencies from wASTRAL. <strong>q1</strong> is the fraction of
+  quartets supporting the main topology; <strong>q2</strong> and <strong>q3</strong> support
+  the two NNI alternatives. Under pure ILS, q2 &approx; q3; substantial asymmetry may
+  indicate hybridization or systematic error.
+</p>
+</section>
+
+<!-- ═══════════════════════ GENE-TREE HETEROGENEITY ═══════════════════════ -->
+<section id="heterogeneity">
+<h2>Gene-tree Heterogeneity</h2>
+
+<p>
+  This section focuses on complete-taxon gene trees (those containing all {{ summary.sample_count }}
+  taxa), because topology comparisons are only meaningful when the taxon set is identical.
+</p>
+
+<div class="chart-row">
+  <div>
+    <h3>RF Distance to Species Tree</h3>
+    <div class="chart-container" id="chart-rf"></div>
+    <p class="caption">
+      The Robinson-Foulds (RF) distance counts the number of bipartitions that differ
+      between each gene tree and the species tree. An RF distance of 0 means the gene tree
+      has the same topology as the species tree. Higher values indicate greater discordance,
+      which may be caused by incomplete lineage sorting, horizontal gene transfer, or
+      phylogenetic estimation error.
+    </p>
+  </div>
+  <div>
+    <h3>Top Gene-tree Topologies</h3>
+    <div class="chart-container" id="chart-topologies"></div>
+    <p class="caption">
+      The most frequent gene-tree topologies among complete-taxon trees. Green bars match
+      the species tree topology; red bars represent alternative topologies. The species tree
+      topology is expected to be the most common, but under strong ILS many loci may show
+      alternative arrangements.
+    </p>
+  </div>
+</div>
+
+<div class="chart-row">
+  <div>
+    <h3>Substitution Models</h3>
+    <div class="chart-container" id="chart-models"></div>
+    <p class="caption">
+      The most frequently selected substitution models across all gene trees, chosen by
+      IQ-TREE's ModelFinder. This reveals the typical sequence evolution patterns in the dataset.
+      {% if summary.sequence_type == "protein" %}
+      Common protein models include LG, WAG, and JTT, with rate heterogeneity modeled
+      by +G (gamma) or +I+G (invariant sites + gamma).
+      {% else %}
+      Common DNA models include GTR, HKY, and TN, with rate heterogeneity modeled
+      by +G (gamma) or +I+G (invariant sites + gamma).
+      {% endif %}
+    </p>
+  </div>
+  <div>
+    <h3>Branch Support Coverage</h3>
+    <div class="chart-container" id="chart-support-coverage"></div>
+    <p class="caption">
+      How many gene trees have branch support values (aBayes posteriors or ultrafast bootstrap).
+      Trees without support values may indicate alignment issues or very short sequences where
+      the support method could not be computed.
+    </p>
+  </div>
+</div>
+</section>
+
+<!-- ═══════════════════════ TOPOLOGY TESTS ═══════════════════════ -->
+{% if topo_tests_available %}
+<section id="topology-tests">
+<h2>Topological Uncertainty</h2>
+
+<p>
+  This section evaluates whether the inferred species tree topology is statistically
+  distinguishable from alternative topologies. Two complementary approaches are used:
+  <strong>quartet posteriors</strong> (coalescent-based, from wASTRAL) and the
+  <strong>AU test</strong> (concatenation-based, from IQ-TREE).
+</p>
+
+<h3>Quartet Posterior Probabilities</h3>
+<div class="table-wrapper">
+<table>
+  <thead>
+    <tr>
+      <th>Branch</th>
+      <th>pp1</th>
+      <th>pp2</th>
+      <th>pp3</th>
+      <th>q1</th>
+      <th>q2</th>
+      <th>q3</th>
+      <th>Contested</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for b in branch_quartet_support %}
+    <tr>
+      <td><strong>{{ b.branch_id }}</strong></td>
+      <td>{{ "%.4f"|format(b.pp1) }}</td>
+      <td>{{ "%.4f"|format(b.pp2) }}</td>
+      <td>{{ "%.4f"|format(b.pp3) }}</td>
+      <td>{{ "%.4f"|format(b.q1) }}</td>
+      <td>{{ "%.4f"|format(b.q2) }}</td>
+      <td>{{ "%.4f"|format(b.q3) }}</td>
+      <td>{{ "Yes" if b.contested else "" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="caption">
+  <strong>pp1, pp2, pp3</strong>: posterior probabilities for the main topology and its two NNI
+  alternatives, estimated under the multispecies coalescent. A branch is flagged as
+  <strong>contested</strong> when pp1 falls below the configured threshold (default 0.95),
+  indicating the data do not strongly favor one topology.
+  <strong>q1, q2, q3</strong>: the corresponding quartet frequency proportions.
+</p>
+
+<h3>AU Topology Test Results</h3>
+<div class="table-wrapper">
+<table>
+  <thead>
+    <tr>
+      <th>Tree</th>
+      <th>Description</th>
+      <th>Source</th>
+      <th>logL</th>
+      <th>&Delta;L</th>
+      <th>p-AU</th>
+      <th>In confidence set</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in au_test_results %}
+    <tr>
+      <td>{{ r.tree_index }}</td>
+      <td>{{ r.description }}</td>
+      <td>{{ r.source }}</td>
+      <td>{{ "%.2f"|format(r.logL) if r.logL is not none else "" }}</td>
+      <td>{{ "%.2f"|format(r.deltaL) if r.deltaL is not none else "" }}</td>
+      <td>{{ "%.4f"|format(r.p_au) if r.p_au is not none else "n/a" }}</td>
+      <td>{{ "Yes" if r.in_confidence_set else "No" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="caption">
+  The approximately unbiased (AU) test evaluates candidate tree topologies against a
+  concatenated supermatrix. <strong>logL</strong> is the log-likelihood; <strong>&Delta;L</strong>
+  is the difference from the best tree. <strong>p-AU</strong> &ge; 0.05 means the topology cannot
+  be rejected at the 5% level and belongs to the <strong>95% confidence set</strong>.
+</p>
+
+<div class="info-box">
+  <strong>Interpretation guide</strong>
+  <ul>
+    <li><strong>Agreement:</strong> When a contested branch (low pp1) also has an alternative tree
+      in the AU confidence set, both coalescent and concatenation perspectives agree that the
+      branch is genuinely unresolved &mdash; the strongest signal of topological ambiguity.</li>
+    <li><strong>Low pp1, AU rejects alternative:</strong> May indicate systematic error
+      (e.g., long-branch attraction) rather than ILS.</li>
+    <li><strong>High pp1, AU keeps alternative:</strong> May indicate ILS that concatenation
+      cannot model &mdash; the coalescent-aware method has higher power for ILS detection.</li>
+  </ul>
+</div>
+</section>
+{% endif %}
+
+<!-- ═══════════════════════ GLOSSARY ═══════════════════════ -->
+<section id="glossary">
+<h2>Glossary &amp; Methods</h2>
+
+<details open>
+<summary>Metric Definitions</summary>
+<div class="content">
+<dl class="glossary">
+  <dt>BUSCO</dt>
+  <dd>Benchmarking Universal Single-Copy Orthologs. A standardized set of genes expected to
+    be present in single copy across a clade. Used here to identify orthologous loci for
+    phylogenomic analysis.</dd>
+
+  <dt>Occupancy</dt>
+  <dd>The fraction of taxa in which a given locus is present. Loci below the occupancy
+    threshold (default 0.8) are excluded to avoid missing-data artifacts.</dd>
+
+  <dt>gCF (Gene Concordance Factor)</dt>
+  <dd>The percentage of decisive gene trees whose topology agrees with a given branch of the
+    species tree. Computed by IQ-TREE. Values near 100% indicate strong gene-tree support;
+    values below 50% suggest the branch may be incorrect or affected by strong ILS.</dd>
+
+  <dt>gDF1, gDF2 (Gene Discordance Factors)</dt>
+  <dd>The percentage of decisive gene trees supporting the first and second NNI alternative
+    topologies at a branch. gCF + gDF1 + gDF2 + gDFP &approx; 100%.</dd>
+
+  <dt>gDFP (Gene Discordance Factor, Polytomy)</dt>
+  <dd>The percentage of decisive gene trees that are uninformative for a branch (i.e., the
+    branch is a polytomy in the gene tree).</dd>
+
+  <dt>sCF (Site Concordance Factor)</dt>
+  <dd>The percentage of decisive alignment sites supporting a branch. Analogous to gCF but
+    at the individual-site level. Computed by IQ-TREE using quartet sampling.</dd>
+
+  <dt>sDF1, sDF2 (Site Discordance Factors)</dt>
+  <dd>Site-level support for the two NNI alternative topologies. Under ILS alone,
+    sDF1 &approx; sDF2.</dd>
+
+  <dt>ASTER Local Posterior (pp)</dt>
+  <dd>The posterior probability that a branch is correct under the multispecies coalescent
+    model, computed by wASTRAL. Values &gt;0.95 indicate strong support.</dd>
+
+  <dt>Quartet Frequencies (q1, q2, q3)</dt>
+  <dd>The proportions of input quartet trees supporting the main topology (q1) and its two
+    NNI alternatives (q2, q3). These sum to 1.0 and quantify how much of the quartet
+    signal favors each resolution.</dd>
+
+  <dt>pp1, pp2, pp3</dt>
+  <dd>Posterior probabilities for the three possible resolutions at each branch, computed by
+    wASTRAL with -u 2. pp1 corresponds to the main topology; pp2 and pp3 to the two NNI
+    alternatives. pp1 + pp2 + pp3 = 1.0.</dd>
+
+  <dt>RF Distance (Robinson-Foulds)</dt>
+  <dd>The number of bipartitions that differ between two unrooted trees. A standard metric
+    of topological dissimilarity. RF = 0 means the trees have identical topologies.</dd>
+
+  <dt>AU Test (Approximately Unbiased)</dt>
+  <dd>A statistical test that evaluates whether candidate tree topologies can be distinguished
+    based on a concatenated sequence alignment. Trees with p-AU &ge; 0.05 cannot be rejected
+    and belong to the 95% confidence set.</dd>
+
+  <dt>ILS (Incomplete Lineage Sorting)</dt>
+  <dd>A biological process where ancestral polymorphisms persist through speciation events,
+    causing gene trees to differ from the species tree. ILS is the primary source of
+    gene-tree discordance in closely related species.</dd>
+
+  <dt>Coalescent Unit</dt>
+  <dd>The unit of branch length in a species tree estimated under the multispecies coalescent.
+    Longer branches (in coalescent units) have less expected discordance from ILS.</dd>
+
+  <dt>NNI (Nearest-Neighbor Interchange)</dt>
+  <dd>A tree rearrangement operation that swaps two subtrees across an internal branch,
+    producing the two possible alternative topologies for that branch.</dd>
+</dl>
+</div>
+</details>
+
+<details>
+<summary>Tools &amp; References</summary>
+<div class="content">
+<ul>
+  <li><strong>BUSCO</strong>: Sim&atilde;o et al. (2015). BUSCO: assessing genome assembly and
+    annotation completeness with single-copy orthologs. <em>Bioinformatics</em> 31(19):3210-3212.</li>
+  <li><strong>MAFFT</strong>: Katoh &amp; Standley (2013). MAFFT multiple sequence alignment
+    software version 7. <em>Mol. Biol. Evol.</em> 30(4):772-780.</li>
+  <li><strong>IQ-TREE 3</strong>: Wong et al. (2026). IQ-TREE 3: Phylogenomic inference software
+    using complex evolutionary models.</li>
+  <li><strong>wASTRAL</strong>: Zhang &amp; Mirarab (2022). Weighting by gene tree uncertainty
+    improves accuracy of quartet-based species trees. <em>MBE</em> 39(12):msac215.</li>
+  <li><strong>gCF/sCF</strong>: Minh et al. (2020). New methods to calculate concordance factors
+    for phylogenomic datasets. <em>MBE</em> 37(9):2727-2733.</li>
+</ul>
+</div>
+</details>
+</section>
+
+</main>
+
+<footer>
+  <div class="container">
+    Generated by <strong>busco2aster</strong> &middot; Self-contained report &mdash; no internet connection required.
+  </div>
+</footer>
+
+<!-- ═══════════════════════ JAVASCRIPT ═══════════════════════ -->
+<script>{{ underscore_js }}</script>
+<script>{{ lodash_js }}</script>
+<script>{{ plotly_js }}</script>
+<script>{{ phylotree_js }}</script>
+<script>
+// ── Data ──
+const sampleQC = {{ sample_qc_json }};
+const locusSummary = {{ locus_summary_json }};
+const alignmentSummary = {{ alignment_summary_json }};
+const branchMetrics = {{ branch_metrics_json }};
+const branchAlternatives = {{ branch_alternatives_json }};
+const geneTreeHeterogeneity = {{ gene_tree_heterogeneity_json }};
+const topologyCounts = {{ topology_counts_json }};
+const speciesTreeNewick = {{ species_tree_newick | tojson }};
+
+const plotlyConfig = {responsive: true, displayModeBar: false};
+const plotlyLayout = (title, xaxis, yaxis, extra) => Object.assign({
+  margin: {l: 60, r: 30, t: 40, b: 50},
+  font: {family: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', size: 12},
+  plot_bgcolor: '#fafafa',
+  paper_bgcolor: '#ffffff',
+  title: {text: title, font: {size: 14}},
+  xaxis: Object.assign({title: xaxis, gridcolor: '#eee'}, {}),
+  yaxis: Object.assign({title: yaxis, gridcolor: '#eee'}, {}),
+}, extra || {});
+
+// ── BUSCO Completeness ──
+(function() {
+  const categories = ['single_copy', 'multi_copy', 'fragmented', 'missing'];
+  const colors = {'single_copy': '#66c2a5', 'multi_copy': '#fc8d62', 'fragmented': '#8da0cb', 'missing': '#e78ac3'};
+  const labels = {'single_copy': 'Single-copy', 'multi_copy': 'Multi-copy', 'fragmented': 'Fragmented', 'missing': 'Missing'};
+  const samples = sampleQC.map(s => s.sample_id);
+  const traces = categories.map(cat => ({
+    y: samples,
+    x: sampleQC.map(s => s[cat + '_percent']),
+    name: labels[cat],
+    type: 'bar',
+    orientation: 'h',
+    marker: {color: colors[cat]}
+  }));
+  Plotly.newPlot('chart-busco', traces, plotlyLayout('', 'Percent (%)', '', {barmode: 'stack', height: Math.max(300, samples.length * 40 + 80)}), plotlyConfig);
+})();
+
+// ── Missingness ──
+(function() {
+  const samples = sampleQC.map(s => s.sample_id);
+  const missing = sampleQC.map(s => (s.retained_missing_fraction || 0) * 100);
+  const present = missing.map(m => 100 - m);
+  Plotly.newPlot('chart-missingness', [
+    {y: samples, x: present, name: 'Present', type: 'bar', orientation: 'h', marker: {color: '#3b7a57'}},
+    {y: samples, x: missing, name: 'Missing', type: 'bar', orientation: 'h', marker: {color: '#c64e4e'}},
+  ], plotlyLayout('', 'Percent of retained loci', '', {barmode: 'stack', height: Math.max(300, samples.length * 40 + 80)}), plotlyConfig);
+})();
+
+// ── Alignment Length ──
+(function() {
+  const lengths = alignmentSummary.map(a => a.alignment_length_sites);
+  Plotly.newPlot('chart-alignment', [{
+    x: lengths, type: 'histogram',
+    marker: {color: '#4c78a8'},
+    xbins: {size: 25}
+  }], plotlyLayout('', 'Alignment length ({{ summary.sequence_length_unit }})', 'Number of loci', {height: 350}), plotlyConfig);
+})();
+
+// ── Filtering Outcomes ──
+(function() {
+  const excluded = locusSummary.filter(l => l.decision !== 'retain' && l.failure_reasons);
+  const reasonCounts = {};
+  excluded.forEach(l => {
+    (l.failure_reasons || '').split(',').forEach(r => {
+      r = r.trim();
+      if (r) reasonCounts[r] = (reasonCounts[r] || 0) + 1;
+    });
+  });
+  const sorted = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1]);
+  if (sorted.length === 0) {
+    document.getElementById('chart-filtering').innerHTML = '<p style="color:#6b7280;padding:1rem">No loci were excluded.</p>';
+    return;
+  }
+  Plotly.newPlot('chart-filtering', [{
+    y: sorted.map(s => s[0]),
+    x: sorted.map(s => s[1]),
+    type: 'bar',
+    orientation: 'h',
+    marker: {color: '#e17c05'}
+  }], plotlyLayout('', 'Excluded loci', '', {height: Math.max(250, sorted.length * 35 + 80)}), plotlyConfig);
+})();
+
+// ── Branch Support Dot Plot ──
+(function() {
+  const metricDefs = [
+    {key: 'aster_local_posterior', label: 'ASTER support', scale: 100},
+    {key: 'aster_q1', label: 'ASTER q1', scale: 100},
+    {key: 'gcf', label: 'gCF', scale: 1},
+    {key: 'scfl', label: 'sCF', scale: 1},
+  ];
+  const colors = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a'];
+  const labels = branchMetrics.map(b => b.label);
+  const traces = metricDefs.map((m, i) => ({
+    x: branchMetrics.map(b => (b[m.key] || 0) * m.scale),
+    y: labels,
+    name: m.label,
+    type: 'scatter',
+    mode: 'markers',
+    marker: {size: 10, color: colors[i]},
+  }));
+  // Add connecting lines per branch
+  const lineTraces = labels.map(label => {
+    const vals = metricDefs.map(m => {
+      const b = branchMetrics.find(b => b.label === label);
+      return (b[m.key] || 0) * m.scale;
+    });
+    return {
+      x: [Math.min(...vals), Math.max(...vals)],
+      y: [label, label],
+      mode: 'lines',
+      line: {color: '#ddd', width: 1},
+      showlegend: false,
+      hoverinfo: 'skip',
+    };
+  });
+  Plotly.newPlot('chart-branch-support', [...lineTraces, ...traces],
+    plotlyLayout('', 'Score (% or concordance factor)', '', {
+      height: Math.max(300, labels.length * 50 + 100),
+      xaxis: {range: [0, 105], title: 'Score (% or concordance factor)', gridcolor: '#eee'},
+    }), plotlyConfig);
+})();
+
+// ── Conflict Charts ──
+function renderConflictChart(containerId, source, altMap, colors, yLabel) {
+  const data = branchAlternatives.filter(d => d.source === source);
+  const branches = [...new Set(data.map(d => d.label))];
+  const altIds = [...new Set(data.map(d => d.alternative_id))];
+  const scale = source === 'aster' ? 100 : 1;
+  const traces = altIds.map(alt => ({
+    x: branches,
+    y: branches.map(b => {
+      const row = data.find(d => d.label === b && d.alternative_id === alt);
+      return row ? (row.value || 0) * scale : 0;
+    }),
+    name: altMap[alt] || alt,
+    type: 'bar',
+    marker: {color: colors[alt]},
+  }));
+  Plotly.newPlot(containerId, traces, plotlyLayout('', 'Species-tree branch', yLabel, {
+    barmode: 'stack', height: 350
+  }), plotlyConfig);
+}
+
+renderConflictChart('chart-gcf-conflict', 'gcf',
+  {main: 'gCF', df1: 'gDF1', df2: 'gDF2', dfp: 'gDFP'},
+  {main: '#66c2a5', df1: '#fc8d62', df2: '#8da0cb', dfp: '#e5c494'},
+  'Percent (%)');
+
+renderConflictChart('chart-scf-conflict', 'scfl',
+  {main: 'sCF', df1: 'sDF1', df2: 'sDF2'},
+  {main: '#fbb4ae', df1: '#b3cde3', df2: '#ccebc5'},
+  'Percent (%)');
+
+renderConflictChart('chart-aster-conflict', 'aster',
+  {t1: 'q1', t2: 'q2', t3: 'q3'},
+  {t1: '#8dd3c7', t2: '#ffffb3', t3: '#bebada'},
+  'Quartet frequency (%)');
+
+// ── Gene-tree Heterogeneity ──
+(function() {
+  const complete = geneTreeHeterogeneity.filter(g => g.is_complete_taxon === true);
+  const rfValues = complete.map(g => g.rf_distance_to_species_tree).filter(v => v != null);
+  Plotly.newPlot('chart-rf', [{
+    x: rfValues, type: 'histogram',
+    marker: {color: '#4c78a8'},
+    xbins: {size: 1}
+  }], plotlyLayout('', 'Robinson-Foulds distance to species tree', 'Number of gene trees', {height: 350}), plotlyConfig);
+})();
+
+(function() {
+  const top10 = topologyCounts.slice(0, 10);
+  Plotly.newPlot('chart-topologies', [{
+    y: top10.map(t => t.topology_id),
+    x: top10.map(t => (t.fraction || 0) * 100),
+    type: 'bar',
+    orientation: 'h',
+    marker: {color: top10.map(t => t.matches_species_tree ? '#3b7a57' : '#c64e4e')},
+    text: top10.map(t => t.matches_species_tree ? 'Species tree' : 'Alternative'),
+    hoverinfo: 'x+text',
+  }], plotlyLayout('', 'Complete-taxon gene trees (%)', '', {height: Math.max(300, top10.length * 35 + 80)}), plotlyConfig);
+})();
+
+(function() {
+  const modelCounts = {};
+  geneTreeHeterogeneity.forEach(g => {
+    if (g.selected_model) modelCounts[g.selected_model] = (modelCounts[g.selected_model] || 0) + 1;
+  });
+  const sorted = Object.entries(modelCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  Plotly.newPlot('chart-models', [{
+    y: sorted.map(s => s[0]),
+    x: sorted.map(s => s[1]),
+    type: 'bar',
+    orientation: 'h',
+    marker: {color: '#72b7b2'},
+  }], plotlyLayout('', 'Number of loci', '', {height: Math.max(250, sorted.length * 35 + 80)}), plotlyConfig);
+})();
+
+(function() {
+  const withSupport = geneTreeHeterogeneity.filter(g => g.support_values_present === true).length;
+  const without = geneTreeHeterogeneity.length - withSupport;
+  Plotly.newPlot('chart-support-coverage', [{
+    x: ['With support', 'Without support'],
+    y: [withSupport, without],
+    type: 'bar',
+    marker: {color: ['#3b7a57', '#c64e4e']},
+  }], plotlyLayout('', '', 'Number of gene trees', {height: 300}), plotlyConfig);
+})();
+
+// ── Species Tree (Phylotree.js) ──
+var currentTreeLayout = 'cladogram';
+
+function setTreeLayout(layout) {
+  currentTreeLayout = layout;
+  document.getElementById('btn-cladogram').classList.toggle('active', layout === 'cladogram');
+  document.getElementById('btn-phylogram').classList.toggle('active', layout === 'phylogram');
+  renderTree();
+}
+
+function renderTree() {
+  const container = document.getElementById('tree-container');
+  container.innerHTML = '';
+
+  if (!speciesTreeNewick || !window.phylotree) {
+    container.innerHTML = '<p style="padding:1rem;color:#6b7280">Species tree not available.</p>';
+    return;
+  }
+
+  try {
+    const tree = new phylotree.phylotree(speciesTreeNewick);
+
+    const width = container.clientWidth || 900;
+    const tipCount = speciesTreeNewick.split(',').length;
+    const height = Math.max(400, tipCount * 45);
+
+    const renderedTree = tree.render({
+      container: '#tree-container',
+      width: width,
+      height: height,
+      'left-offset': 10,
+      'show-scale': currentTreeLayout === 'phylogram',
+      'is-radial': false,
+      'align-tips': currentTreeLayout === 'cladogram',
+      'node-span': function(node) { return 1; },
+      zoom: true,
+      brush: false,
+      selectable: false,
+      collapsible: false,
+      transitions: false,
+    });
+
+    if (currentTreeLayout === 'cladogram') {
+      tree.placenodes();
+    }
+
+    // Style tip labels for readability
+    const svg = container.querySelector('svg');
+    if (svg) {
+      svg.querySelectorAll('.phylotree-node-text').forEach(el => {
+        el.style.fontSize = '13px';
+        el.style.fontFamily = 'monospace';
+      });
+      // Style internal labels (branch IDs)
+      svg.querySelectorAll('.phylotree-node-text').forEach(el => {
+        const text = el.textContent || '';
+        if (/^B\d+$/.test(text)) {
+          el.style.fontSize = '11px';
+          el.style.fontWeight = 'bold';
+          el.style.fill = '#2563eb';
+        }
+      });
+    }
+  } catch (e) {
+    container.innerHTML = '<p style="padding:1rem;color:#dc2626">Error rendering tree: ' + e.message + '</p>';
+    console.error('Tree rendering error:', e);
+  }
+}
+
+// Initialize tree on load
+document.addEventListener('DOMContentLoaded', renderTree);
+</script>
+</body>
+</html>
