@@ -41,16 +41,3 @@ rule create_env_dna_extract:
         "../envs/dna_extract.yaml"
     shell:
         "gffread --version >/dev/null 2>&1 && touch {output}"
-
-
-rule create_env_report:
-    output:
-        "/tmp/busco2aster_env_report"
-    conda:
-        "../envs/report.yaml"
-    shell:
-        (
-            "quarto --version >/dev/null && "
-            "Rscript -e 'library(ggtree); library(phangorn)' >/dev/null && "
-            "touch {output}"
-        )
