@@ -171,6 +171,20 @@ details .content { padding: 1rem; }
 .toggle-btn.active { background: #1d4ed8; }
 #tree-container { width: 100%; min-height: 400px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 #tree-container svg { width: 100%; }
+/* phylotree.css (vendored from phylotree@2.6.0), scoped to #tree-container */
+#tree-container .branch { fill: none; stroke: #555; stroke-width: 1.5px; }
+#tree-container .branch-selected { stroke: #e7298a !important; stroke-width: 3px; }
+#tree-container .branch-tagged { stroke: #00f; stroke-dasharray: 10,5; stroke-width: 2px; }
+#tree-container .branch-tracer { stroke: #bbb; stroke-dasharray: 3,4; stroke-width: 1px; }
+#tree-container .branch:hover { stroke-width: 3px; stroke: #111; }
+#tree-container .node circle, #tree-container .node ellipse, #tree-container .node rect { fill: #4c78a8; stroke: #222; stroke-width: 0.5px; }
+#tree-container .internal-node circle, #tree-container .internal-node ellipse, #tree-container .internal-node rect { fill: #ccc; stroke: #222; stroke-width: 0.5px; }
+#tree-container .node { font: 12px sans-serif; }
+#tree-container .tree-scale-bar text { font: 10px sans-serif; }
+#tree-container .tree-scale-bar line, #tree-container .tree-scale-bar path { fill: none; stroke: #000; shape-rendering: crispEdges; }
+#tree-container .clade { fill: lightgrey; stroke: #222; stroke-width: 1px; opacity: 0.5; }
+/* White halo on labels so any overlapping branch/tracer line does not appear as a strike-through. */
+#tree-container .phylotree-node-text { paint-order: stroke; stroke: #ffffff; stroke-width: 3px; stroke-linejoin: round; }
 .pipeline-flow {
   display: flex;
   flex-wrap: wrap;
@@ -729,6 +743,13 @@ dl.glossary dd { margin-left: 1.5rem; margin-bottom: 0.5rem; }
 <!-- ═══════════════════════ JAVASCRIPT ═══════════════════════ -->
 <script>{{ underscore_js }}</script>
 <script>{{ lodash_js }}</script>
+<script>
+// phylotree.js's UMD wrapper reads window._ (underscore) and window._$1 (lodash).
+// Both libraries grab window._, so restore underscore and expose lodash separately.
+if (window._ && typeof window._.noConflict === 'function') {
+  window._$1 = window._.noConflict();
+}
+</script>
 <script>{{ plotly_js }}</script>
 <script>{{ phylotree_js }}</script>
 <script>
@@ -988,27 +1009,46 @@ function renderTree() {
     const tree = new phylotree.phylotree(speciesTreeNewick);
     const isCladogram = currentTreeLayout === 'cladogram';
 
-    // For cladogram: override branch lengths to equal steps
-    if (isCladogram) {
-      tree.setBranchLength(function(node) { return undefined; });
-    }
-
     const width = container.clientWidth || 900;
     const tipCount = speciesTreeNewick.split(',').length;
     const height = Math.max(400, tipCount * 50);
+
+    // Compute a small minimum branch length so wASTRAL's zero-length tip branches
+    // (coalescent units are undefined for leaves) render as visible short segments
+    // in phylogram mode.
+    let maxBL = 0;
+    tree.nodes.each(function(n) {
+      const bl = parseFloat(n.data && n.data.attribute);
+      if (!isNaN(bl) && bl > maxBL) maxBL = bl;
+    });
+    const minBL = maxBL > 0 ? maxBL * 0.02 : 0.05;
+
+    // Override the branch-length accessor:
+    //   - Cladogram: return 1 for every branch so the layout depends only on topology.
+    //     (Using `scaling: false` instead is buggy in phylotree 2.6 — it produces a
+    //     reversed layout with leaves on the left.)
+    //   - Phylogram: keep real branch lengths, but lift zero-length tip branches to
+    //     `minBL` so tips separate visually from their parent internal nodes.
+    tree.setBranchLength(function(node) {
+      if (isCladogram) return 1;
+      const bl = parseFloat(node.data && node.data.attribute);
+      if (isNaN(bl)) return minBL;
+      return Math.max(bl, minBL);
+    });
 
     const display = tree.render({
       container: '#tree-container',
       width: width,
       height: height,
+      layout: 'left-to-right',
       'left-offset': 10,
       'show-scale': isCladogram ? false : 'top',
       'is-radial': false,
-      'align-tips': isCladogram,
+      'align-tips': true,
       'left-right-spacing': 'fit-to-size',
       'top-bottom-spacing': 'fit-to-size',
       'internal-names': true,
-      scaling: !isCladogram,
+      scaling: true,
       zoom: true,
       brush: false,
       selectable: false,
@@ -1019,12 +1059,19 @@ function renderTree() {
       'font-size': 14,
     });
 
+    // phylotree.render() creates the SVG in memory but does not attach it;
+    // we must append it to the container ourselves.
+    container.appendChild(display.show());
+
     // Style node labels after rendering
     const svg = container.querySelector('svg');
     if (svg) {
       svg.querySelectorAll('.phylotree-node-text').forEach(function(el) {
         const text = (el.textContent || '').trim();
-        if (/^B\d+$/.test(text)) {
+        if (text === 'root') {
+          // phylotree auto-names the root node; hide it to reduce visual noise.
+          el.style.display = 'none';
+        } else if (/^B\d+$/.test(text)) {
           // Internal branch labels
           el.style.fontSize = '12px';
           el.style.fontWeight = 'bold';

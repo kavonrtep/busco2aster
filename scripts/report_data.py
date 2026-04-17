@@ -14,6 +14,7 @@ from .tree_utils import (
     branch_label_map,
     canonical_branch_key,
     canonical_topology_key,
+    fill_missing_branch_lengths,
     informative_branch_key,
     internal_branch_key_map,
     iter_nodes,
@@ -213,6 +214,7 @@ def _extract_branch_tables(
 ) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     species_root = read_newick(species_tree_path)
     labeled_root = relabel_tree_with_branch_ids(species_root)
+    fill_missing_branch_lengths(labeled_root, default="0")
     write_newick(output_tree_path, labeled_root)
 
     species_branch_nodes = internal_branch_key_map(species_root)

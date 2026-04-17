@@ -202,5 +202,13 @@ def relabel_tree_with_branch_ids(root: TreeNode) -> TreeNode:
     return cloned_root
 
 
+def fill_missing_branch_lengths(root: TreeNode, default: str = "0") -> None:
+    for node in iter_nodes(root):
+        if node is root:
+            continue
+        if node.length is None:
+            node.length = default
+
+
 def canonical_topology_key(root: TreeNode) -> str:
     return ";".join(sorted(internal_branch_key_map(root)))

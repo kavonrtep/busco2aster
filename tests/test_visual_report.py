@@ -4,7 +4,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from scripts.report_data import build_report_data_bundle
-from scripts.tree_utils import canonical_topology_key, parse_newick, relabel_tree_with_branch_ids, render_newick
+from scripts.tree_utils import (
+    canonical_topology_key,
+    fill_missing_branch_lengths,
+    parse_newick,
+    relabel_tree_with_branch_ids,
+    render_newick,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +32,21 @@ class TreeUtilsUnitTests(unittest.TestCase):
         rendered = render_newick(relabeled)
         self.assertIn("B1", rendered)
         self.assertIn("B2", rendered)
+
+    def test_fill_missing_branch_lengths_assigns_default_to_leaves(self):
+        root = parse_newick("((a,b)B1:4.09,c)B2:0.3;")
+        fill_missing_branch_lengths(root, default="0")
+        rendered = render_newick(root)
+        self.assertIn("a:0", rendered)
+        self.assertIn("b:0", rendered)
+        self.assertIn("c:0", rendered)
+        self.assertIn("B1:4.09", rendered)
+        self.assertIn("B2:0.3", rendered)
+
+    def test_fill_missing_branch_lengths_leaves_root_unchanged(self):
+        root = parse_newick("(a,b);")
+        fill_missing_branch_lengths(root, default="0")
+        self.assertIsNone(root.length)
 
 
 class VisualReportDataTests(unittest.TestCase):
