@@ -73,7 +73,7 @@ Rules requiring Conda environments: manifest validation, BUSCO, assembly prep, D
 | `workflow/rules/` | One `.smk` file per stage; `topology_tests.smk` is the newest |
 | `scripts/` | Python helper modules; `quartet_support.py`, `generate_alternatives.py`, `build_supermatrix.py`, `parse_au_test.py`, `topology_tests.py` are the topology-test helpers |
 | `workflow/envs/` | Conda environment specs (one per stage group) |
-| `reports/report.qmd` | Quarto template for the HTML visual report |
+| `reports/template.html.j2` | Jinja2 template for the self-contained HTML visual report |
 | `busco2aster.def` | Apptainer/Singularity image definition |
 | `.github/workflows/build-sif.yaml` | CI: builds `.sif` on version tags, runs smoke tests, uploads to release |
 
