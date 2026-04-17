@@ -743,15 +743,18 @@ const topologyCounts = {{ topology_counts_json }};
 const speciesTreeNewick = {{ species_tree_newick | tojson }};
 
 const plotlyConfig = {responsive: true, displayModeBar: false};
-const plotlyLayout = (title, xaxis, yaxis, extra) => Object.assign({
-  margin: {l: 60, r: 30, t: 40, b: 50},
-  font: {family: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', size: 12},
-  plot_bgcolor: '#fafafa',
-  paper_bgcolor: '#ffffff',
-  title: {text: title, font: {size: 14}},
-  xaxis: Object.assign({title: xaxis, gridcolor: '#eee'}, {}),
-  yaxis: Object.assign({title: yaxis, gridcolor: '#eee'}, {}),
-}, extra || {});
+function plotlyLayout(title, xaxis, yaxis, extra) {
+  const base = {
+    margin: {l: 200, r: 30, t: 40, b: 60},
+    font: {family: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', size: 12},
+    plot_bgcolor: '#fafafa',
+    paper_bgcolor: '#ffffff',
+    title: {text: title, font: {size: 14}},
+    xaxis: {title: xaxis, gridcolor: '#eee'},
+    yaxis: {title: yaxis, gridcolor: '#eee'},
+  };
+  return Object.assign(base, extra || {});
+}
 
 // ── BUSCO Completeness ──
 (function() {
@@ -767,28 +770,40 @@ const plotlyLayout = (title, xaxis, yaxis, extra) => Object.assign({
     orientation: 'h',
     marker: {color: colors[cat]}
   }));
-  Plotly.newPlot('chart-busco', traces, plotlyLayout('', 'Percent (%)', '', {barmode: 'stack', height: Math.max(300, samples.length * 40 + 80)}), plotlyConfig);
+  const maxLabelLen = Math.max(...samples.map(s => s.length)) * 8 + 20;
+  Plotly.newPlot('chart-busco', traces, plotlyLayout('', 'Percent (%)', '', {barmode: 'stack', height: Math.max(300, samples.length * 40 + 80), margin: {l: maxLabelLen, r: 30, t: 40, b: 60}}), plotlyConfig);
 })();
 
 // ── Missingness ──
 (function() {
   const samples = sampleQC.map(s => s.sample_id);
+  const maxLabelLen = Math.max(...samples.map(s => s.length)) * 8 + 20;
   const missing = sampleQC.map(s => (s.retained_missing_fraction || 0) * 100);
   const present = missing.map(m => 100 - m);
   Plotly.newPlot('chart-missingness', [
     {y: samples, x: present, name: 'Present', type: 'bar', orientation: 'h', marker: {color: '#3b7a57'}},
     {y: samples, x: missing, name: 'Missing', type: 'bar', orientation: 'h', marker: {color: '#c64e4e'}},
-  ], plotlyLayout('', 'Percent of retained loci', '', {barmode: 'stack', height: Math.max(300, samples.length * 40 + 80)}), plotlyConfig);
+  ], plotlyLayout('', 'Percent of retained loci', '', {barmode: 'stack', height: Math.max(300, samples.length * 40 + 80), margin: {l: maxLabelLen, r: 30, t: 40, b: 60}}), plotlyConfig);
 })();
 
 // ── Alignment Length ──
 (function() {
-  const lengths = alignmentSummary.map(a => a.alignment_length_sites);
+  const lengths = alignmentSummary.map(a => Number(a.alignment_length_sites));
+  // Build histogram manually for reliability across plotly bundles
+  const binSize = 50;
+  const minVal = Math.floor(Math.min(...lengths) / binSize) * binSize;
+  const maxVal = Math.ceil(Math.max(...lengths) / binSize) * binSize;
+  const bins = [];
+  const counts = [];
+  for (let b = minVal; b < maxVal; b += binSize) {
+    bins.push(b + binSize / 2);
+    counts.push(lengths.filter(v => v >= b && v < b + binSize).length);
+  }
   Plotly.newPlot('chart-alignment', [{
-    x: lengths, type: 'histogram',
+    x: bins, y: counts, type: 'bar',
     marker: {color: '#4c78a8'},
-    xbins: {size: 25}
-  }], plotlyLayout('', 'Alignment length ({{ summary.sequence_length_unit }})', 'Number of loci', {height: 350}), plotlyConfig);
+    width: binSize * 0.9,
+  }], plotlyLayout('', 'Alignment length ({{ summary.sequence_length_unit }})', 'Number of loci', {height: 350, margin: {l: 60, r: 30, t: 40, b: 60}, bargap: 0.05}), plotlyConfig);
 })();
 
 // ── Filtering Outcomes ──
@@ -806,13 +821,14 @@ const plotlyLayout = (title, xaxis, yaxis, extra) => Object.assign({
     document.getElementById('chart-filtering').innerHTML = '<p style="color:#6b7280;padding:1rem">No loci were excluded.</p>';
     return;
   }
+  const maxLabelLen = Math.max(...sorted.map(s => s[0].length)) * 8 + 20;
   Plotly.newPlot('chart-filtering', [{
     y: sorted.map(s => s[0]),
     x: sorted.map(s => s[1]),
     type: 'bar',
     orientation: 'h',
     marker: {color: '#e17c05'}
-  }], plotlyLayout('', 'Excluded loci', '', {height: Math.max(250, sorted.length * 35 + 80)}), plotlyConfig);
+  }], plotlyLayout('', 'Excluded loci', '', {height: Math.max(250, sorted.length * 35 + 80), margin: {l: maxLabelLen, r: 30, t: 40, b: 60}}), plotlyConfig);
 })();
 
 // ── Branch Support Dot Plot ──
@@ -894,12 +910,19 @@ renderConflictChart('chart-aster-conflict', 'aster',
 // ── Gene-tree Heterogeneity ──
 (function() {
   const complete = geneTreeHeterogeneity.filter(g => g.is_complete_taxon === true);
-  const rfValues = complete.map(g => g.rf_distance_to_species_tree).filter(v => v != null);
+  const rfValues = complete.map(g => Number(g.rf_distance_to_species_tree)).filter(v => !isNaN(v));
+  // Build histogram manually
+  const maxRF = Math.max(...rfValues, 1);
+  const rfBins = [];
+  const rfCounts = [];
+  for (let b = 0; b <= maxRF; b++) {
+    rfBins.push(b);
+    rfCounts.push(rfValues.filter(v => v === b).length);
+  }
   Plotly.newPlot('chart-rf', [{
-    x: rfValues, type: 'histogram',
+    x: rfBins, y: rfCounts, type: 'bar',
     marker: {color: '#4c78a8'},
-    xbins: {size: 1}
-  }], plotlyLayout('', 'Robinson-Foulds distance to species tree', 'Number of gene trees', {height: 350}), plotlyConfig);
+  }], plotlyLayout('', 'Robinson-Foulds distance to species tree', 'Number of gene trees', {height: 350, margin: {l: 60, r: 30, t: 40, b: 60}, bargap: 0.05}), plotlyConfig);
 })();
 
 (function() {
@@ -912,7 +935,7 @@ renderConflictChart('chart-aster-conflict', 'aster',
     marker: {color: top10.map(t => t.matches_species_tree ? '#3b7a57' : '#c64e4e')},
     text: top10.map(t => t.matches_species_tree ? 'Species tree' : 'Alternative'),
     hoverinfo: 'x+text',
-  }], plotlyLayout('', 'Complete-taxon gene trees (%)', '', {height: Math.max(300, top10.length * 35 + 80)}), plotlyConfig);
+  }], plotlyLayout('', 'Complete-taxon gene trees (%)', '', {height: Math.max(300, top10.length * 35 + 80), margin: {l: 60, r: 30, t: 40, b: 60}}), plotlyConfig);
 })();
 
 (function() {
@@ -921,13 +944,14 @@ renderConflictChart('chart-aster-conflict', 'aster',
     if (g.selected_model) modelCounts[g.selected_model] = (modelCounts[g.selected_model] || 0) + 1;
   });
   const sorted = Object.entries(modelCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const maxModelLen = Math.max(...sorted.map(s => s[0].length)) * 8 + 20;
   Plotly.newPlot('chart-models', [{
     y: sorted.map(s => s[0]),
     x: sorted.map(s => s[1]),
     type: 'bar',
     orientation: 'h',
     marker: {color: '#72b7b2'},
-  }], plotlyLayout('', 'Number of loci', '', {height: Math.max(250, sorted.length * 35 + 80)}), plotlyConfig);
+  }], plotlyLayout('', 'Number of loci', '', {height: Math.max(250, sorted.length * 35 + 80), margin: {l: maxModelLen, r: 30, t: 40, b: 60}}), plotlyConfig);
 })();
 
 (function() {
@@ -962,45 +986,54 @@ function renderTree() {
 
   try {
     const tree = new phylotree.phylotree(speciesTreeNewick);
+    const isCladogram = currentTreeLayout === 'cladogram';
+
+    // For cladogram: override branch lengths to equal steps
+    if (isCladogram) {
+      tree.setBranchLength(function(node) { return undefined; });
+    }
 
     const width = container.clientWidth || 900;
     const tipCount = speciesTreeNewick.split(',').length;
-    const height = Math.max(400, tipCount * 45);
+    const height = Math.max(400, tipCount * 50);
 
-    const renderedTree = tree.render({
+    const display = tree.render({
       container: '#tree-container',
       width: width,
       height: height,
       'left-offset': 10,
-      'show-scale': currentTreeLayout === 'phylogram',
+      'show-scale': isCladogram ? false : 'top',
       'is-radial': false,
-      'align-tips': currentTreeLayout === 'cladogram',
-      'node-span': function(node) { return 1; },
+      'align-tips': isCladogram,
+      'left-right-spacing': 'fit-to-size',
+      'top-bottom-spacing': 'fit-to-size',
+      'internal-names': true,
+      scaling: !isCladogram,
       zoom: true,
       brush: false,
       selectable: false,
       collapsible: false,
+      reroot: false,
+      'show-menu': false,
       transitions: false,
+      'font-size': 14,
     });
 
-    if (currentTreeLayout === 'cladogram') {
-      tree.placenodes();
-    }
-
-    // Style tip labels for readability
+    // Style node labels after rendering
     const svg = container.querySelector('svg');
     if (svg) {
-      svg.querySelectorAll('.phylotree-node-text').forEach(el => {
-        el.style.fontSize = '13px';
-        el.style.fontFamily = 'monospace';
-      });
-      // Style internal labels (branch IDs)
-      svg.querySelectorAll('.phylotree-node-text').forEach(el => {
-        const text = el.textContent || '';
+      svg.querySelectorAll('.phylotree-node-text').forEach(function(el) {
+        const text = (el.textContent || '').trim();
         if (/^B\d+$/.test(text)) {
-          el.style.fontSize = '11px';
+          // Internal branch labels
+          el.style.fontSize = '12px';
           el.style.fontWeight = 'bold';
           el.style.fill = '#2563eb';
+        } else if (text.length > 0 && !/^\d/.test(text)) {
+          // Tip labels
+          el.style.fontSize = '14px';
+          el.style.fontFamily = 'monospace';
+          el.style.fontStyle = 'italic';
         }
       });
     }
