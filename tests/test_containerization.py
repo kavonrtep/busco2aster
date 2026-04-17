@@ -262,10 +262,7 @@ class ContainerizationWorkflowTests(unittest.TestCase):
         self.assertIn("rule create_env_assembly_prep:", result.stdout)
         self.assertIn("rule create_env_dna_extract:", result.stdout)
         self.assertIn("rule create_env_alignment:", result.stdout)
-        self.assertTrue(
-            "rule create_env_report:" in result.stdout
-            or "/tmp/busco2aster_env_report" in result.stdout
-        )
+        self.assertNotIn("create_env_report", result.stdout)
 
     def test_create_env_assembly_prep_rule_validates_seqkit(self):
         helper_text = (REPO_ROOT / "workflow" / "rules" / "_create_envs.smk").read_text(
@@ -281,21 +278,21 @@ class ContainerizationWorkflowTests(unittest.TestCase):
         self.assertIn("/tmp/busco2aster_env_dna_extract", helper_text)
         self.assertIn("gffread --version", helper_text)
 
-    def test_create_env_report_rule_validates_quarto_and_r_packages(self):
+    def test_create_envs_does_not_include_report_env(self):
         helper_text = (REPO_ROOT / "workflow" / "rules" / "_create_envs.smk").read_text(
             encoding="utf-8"
         )
-        self.assertIn("quarto --version", helper_text)
-        self.assertIn("library(ggtree); library(phangorn)", helper_text)
+        self.assertNotIn("report.yaml", helper_text)
+        self.assertNotIn("quarto", helper_text)
 
-    def test_github_workflow_smoke_tests_report_environment_inside_container(self):
+    def test_github_workflow_smoke_tests_jinja2_inside_container(self):
         workflow_text = (REPO_ROOT / ".github" / "workflows" / "build-sif.yaml").read_text(
             encoding="utf-8"
         )
         self.assertIn("--snakefile /opt/pipeline/workflow/Snakefile_create_envs", workflow_text)
         self.assertIn("/tmp/busco2aster_env_assembly_prep", workflow_text)
         self.assertIn("/tmp/busco2aster_env_dna_extract", workflow_text)
-        self.assertIn("/tmp/busco2aster_env_report", workflow_text)
+        self.assertIn("import jinja2", workflow_text)
 
     def test_run_pipeline_wrapper_supports_local_dry_run(self):
         result = subprocess.run(
