@@ -2,6 +2,9 @@ samples: config/samples.tsv
 results_dir: results
 metadata_dir: results/metadata
 work_dir: work
+# Scratch root for raw BUSCO output; discarded after the artifacts are copied
+# into results/busco/. Safe to point at job-scoped scratch ($SCRATCHDIR) - the
+# value is a Snakemake resource, so changing it does not re-trigger run_busco.
 busco_work_root: work/busco
 busco_lineage: solanales_odb12
 busco_download_path: work/busco_downloads

@@ -175,6 +175,29 @@ Important runtime rule:
 - keep `results/`, `work/`, `.snakemake/`, `.cache/`, and BUSCO downloads on the
   host bind-mounted directory, not inside the image
 
+### Resuming on a Batch Scheduler
+
+BUSCO results under `results/busco/` are a cache: once a sample has a valid
+`run.complete`, resubmitting the workflow must not re-run BUSCO for it.
+
+`busco_work_root` may safely point at node-local scratch that changes between
+submissions (PBS `$SCRATCHDIR`, Slurm `$TMPDIR`, ...). It names a directory that
+is discarded once the artifacts have been copied into `results/busco/`, and it is
+declared as a Snakemake *resource*, not a *param*, so a new value does not
+re-trigger `run_busco`.
+
+Two things to know when resuming:
+
+- The first run after upgrading to a version that carries this fix re-runs BUSCO
+  once, because the recorded rule signature changed. To adopt an existing
+  `results/busco/` cache without paying for that, resubmit once with
+  `--snakemake-args="--rerun-triggers mtime"`, then drop the flag.
+- Avoid `--keep-incomplete` for BUSCO runs. If a `run_busco` job dies partway
+  (out of disk or file-count quota, walltime), it leaves a half-written sample
+  directory that later runs refuse to start from
+  (`IncompleteFilesException`). Delete the affected `results/busco/<sample>/`
+  directories and resubmit.
+
 ## Main Outputs
 
 Key outputs are:

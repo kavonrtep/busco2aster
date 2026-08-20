@@ -65,9 +65,16 @@ rule run_busco:
         completion="results/busco/{sample}/run.complete",
     params:
         sample_dir="results/busco/{sample}",
-        raw_root=lambda wildcards: f"{BUSCO_WORK_ROOT}/{wildcards.sample}/raw",
         lineage=BUSCO_LINEAGE,
         download_path=BUSCO_DOWNLOAD_PATH,
+    resources:
+        # Scratch root only; deliberately NOT a param. Under a batch scheduler
+        # BUSCO_WORK_ROOT is job-scoped (e.g. PBS $SCRATCHDIR), so keeping it in
+        # params made snakemake's params rerun-trigger fire on every submission
+        # and re-run BUSCO for every sample. Resources are not hashed, and the
+        # value never influences a result: the directory is discarded once
+        # standardize_busco_run has copied the artifacts into results/busco/.
+        raw_root=lambda wildcards: f"{BUSCO_WORK_ROOT}/{wildcards.sample}/raw",
     threads:
         get_thread_count("busco")
     conda:
@@ -75,9 +82,9 @@ rule run_busco:
     shell:
         r"""
         mkdir -p {params.sample_dir:q}
-        mkdir -p {params.raw_root:q}
+        mkdir -p {resources.raw_root:q}
         printf '#!/usr/bin/env bash\nset -euo pipefail\n' > {output.command:q}
-        printf '%s\n' "busco --in {input.assembly:q} --mode genome --lineage_dataset {params.lineage:q} --cpu {threads} --out {wildcards.sample:q} --out_path {params.raw_root:q} --download_path {params.download_path:q} -f" >> {output.command:q}
+        printf '%s\n' "busco --in {input.assembly:q} --mode genome --lineage_dataset {params.lineage:q} --cpu {threads} --out {wildcards.sample:q} --out_path {resources.raw_root:q} --download_path {params.download_path:q} -f" >> {output.command:q}
         bash {output.command:q}
-        python3 -m scripts.standardize_busco_run --sample-id {wildcards.sample:q} --sample-dir {params.sample_dir:q} --raw-root {params.raw_root:q}
+        python3 -m scripts.standardize_busco_run --sample-id {wildcards.sample:q} --sample-dir {params.sample_dir:q} --raw-root {resources.raw_root:q}
         """
