@@ -53,18 +53,27 @@ class BuscoUnitTests(unittest.TestCase):
         self.assertEqual(paths["sample_root"], "results/busco/solanum_chilense")
         self.assertEqual(paths["raw_root"], "work/busco/solanum_chilense/raw")
         self.assertEqual(
-            paths["single_copy_sequence_dir"],
+            paths["single_copy_faa"],
+            "results/busco/solanum_chilense/busco_sequences/single_copy.faa",
+        )
+        self.assertEqual(
+            paths["single_copy_gff"],
+            "results/busco/solanum_chilense/busco_sequences/single_copy.gff",
+        )
+        self.assertEqual(
+            paths["single_copy_per_locus_dir"],
             "results/busco/solanum_chilense/busco_sequences/single_copy_busco_sequences",
         )
         self.assertEqual(paths["completion"], "results/busco/solanum_chilense/run.complete")
         self.assertEqual(paths["short_summary"], "results/busco/solanum_chilense/short_summary.txt")
 
-    def test_hydrate_stable_busco_sequence_paths_prefers_stable_dirs(self):
+    def test_hydrate_stable_busco_sequence_paths_prefers_concatenated_files(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
-            stable_dir = repo_root / "results" / "busco" / "sample1" / "busco_sequences" / "single_copy_busco_sequences"
-            stable_dir.mkdir(parents=True)
             stable_paths = busco_output_paths("sample1")
+            stable_faa = repo_root / stable_paths["single_copy_faa"]
+            stable_faa.parent.mkdir(parents=True)
+            stable_faa.write_text(">busco_a\nMA\n", encoding="utf-8")
             hydrated = hydrate_stable_busco_sequence_paths(
                 {
                     "single_copy_busco_sequences": "results/busco/sample1/raw/run/busco_sequences/single_copy_busco_sequences",
@@ -74,13 +83,31 @@ class BuscoUnitTests(unittest.TestCase):
                 repo_root,
             )
             self.assertEqual(
-                hydrated["single_copy_busco_sequences"],
-                stable_paths["single_copy_sequence_dir"],
+                hydrated["single_copy_busco_sequences"], stable_paths["single_copy_faa"]
             )
+            self.assertEqual(hydrated["single_copy_busco_gff"], stable_paths["single_copy_gff"])
             self.assertEqual(
                 hydrated["multi_copy_busco_sequences"],
                 "results/busco/sample1/raw/run/busco_sequences/multi_copy_busco_sequences",
             )
+
+    def test_hydrate_stable_busco_sequence_paths_keeps_per_locus_directories(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            stable_paths = busco_output_paths("sample1")
+            (repo_root / stable_paths["single_copy_per_locus_dir"]).mkdir(parents=True)
+            hydrated = hydrate_stable_busco_sequence_paths(
+                {
+                    "single_copy_busco_sequences": "results/busco/sample1/raw/run/busco_sequences/single_copy_busco_sequences",
+                },
+                stable_paths,
+                repo_root,
+            )
+            self.assertEqual(
+                hydrated["single_copy_busco_sequences"],
+                stable_paths["single_copy_per_locus_dir"],
+            )
+            self.assertNotIn("single_copy_busco_gff", hydrated)
 
 
 def _rule_block(text: str, rule_name: str) -> str:

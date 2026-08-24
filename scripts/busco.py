@@ -9,13 +9,24 @@ import shutil
 from collections import Counter
 from pathlib import Path
 
+from .busco_sequences import (
+    CATEGORY_BY_STATUS,
+    CONCATENATED_LAYOUT,
+    FAA_ARTIFACT_BY_CATEGORY,
+    GFF_ARTIFACT_BY_CATEGORY,
+    LEGACY_DIR_BY_CATEGORY,
+    artifact_layout,
+    concatenate_busco_category,
+    concatenated_category_paths,
+    has_fasta_records_for_id,
+    has_gff_block,
+    is_concatenated_artifact,
+)
 from .manifest import write_tsv
 
 VALIDATED_MANIFEST_COLUMNS = ("sample_id", "taxon_id", "sanitized_taxon_id", "assembly_fasta")
 BUSCO_SEQUENCE_ARTIFACTS = {
-    "Complete": "single_copy_busco_sequences",
-    "Duplicated": "multi_copy_busco_sequences",
-    "Fragmented": "fragmented_busco_sequences",
+    status: FAA_ARTIFACT_BY_CATEGORY[category] for status, category in CATEGORY_BY_STATUS.items()
 }
 BUSCO_SUMMARY_FIELDNAMES = [
     "sample_id",
@@ -57,9 +68,10 @@ BUSCO_SUMMARY_FIELDNAMES = [
     "short_summary_path",
     "full_table_path",
     "run_complete_path",
-    "single_copy_sequence_dir",
-    "multi_copy_sequence_dir",
-    "fragmented_sequence_dir",
+    "sequence_layout",
+    "single_copy_sequence_path",
+    "multi_copy_sequence_path",
+    "fragmented_sequence_path",
 ]
 BUSCO_RECORD_FIELDNAMES = [
     "sample_id",
@@ -153,19 +165,25 @@ def load_validated_manifest_rows(path: Path) -> list[dict[str, str]]:
 def busco_output_paths(sample_id: str) -> dict[str, str]:
     sample_root = Path("results") / "busco" / sample_id
     sequence_root = sample_root / "busco_sequences"
-    return {
+    paths = {
         "sample_root": sample_root.as_posix(),
         "raw_root": (Path("work") / "busco" / sample_id / "raw").as_posix(),
         "sequence_root": sequence_root.as_posix(),
-        "single_copy_sequence_dir": (sequence_root / "single_copy_busco_sequences").as_posix(),
-        "multi_copy_sequence_dir": (sequence_root / "multi_copy_busco_sequences").as_posix(),
-        "fragmented_sequence_dir": (sequence_root / "fragmented_busco_sequences").as_posix(),
         "command": (sample_root / "command.sh").as_posix(),
         "paths": (sample_root / "paths.tsv").as_posix(),
         "short_summary": (sample_root / "short_summary.txt").as_posix(),
         "full_table": (sample_root / "full_table.tsv").as_posix(),
         "completion": (sample_root / "run.complete").as_posix(),
     }
+
+    for category, legacy_dir in LEGACY_DIR_BY_CATEGORY.items():
+        faa_path, gff_path = concatenated_category_paths(sequence_root, category)
+        paths[f"{category}_faa"] = faa_path.as_posix()
+        paths[f"{category}_gff"] = gff_path.as_posix()
+        # Where runs predating the concatenated layout keep the same sequences.
+        paths[f"{category}_per_locus_dir"] = (sequence_root / legacy_dir).as_posix()
+
+    return paths
 
 
 def load_busco_artifact_paths(path: Path) -> dict[str, str]:
@@ -334,29 +352,44 @@ def resolve_busco_sequence_paths(
     artifact_paths: dict[str, str],
     repo_root: Path,
 ) -> dict[str, str]:
-    artifact_name = BUSCO_SEQUENCE_ARTIFACTS.get(status, "")
-    if not artifact_name:
+    """Address one locus's sequences, in either the concatenated or per-locus layout."""
+    category = CATEGORY_BY_STATUS.get(status, "")
+    if not category:
         return {"sequence_category": "", "sequence_dir": "", "faa_path": "", "gff_path": ""}
 
-    sequence_dir = artifact_paths.get(artifact_name, "")
-    if not sequence_dir:
+    artifact_name = FAA_ARTIFACT_BY_CATEGORY[category]
+    recorded_path = artifact_paths.get(artifact_name, "")
+    if not recorded_path:
         raise BuscoValidationError(
             f"BUSCO artifact index does not provide {artifact_name!r} for status {status!r}."
         )
 
-    resolved_dir = _resolve_repo_path(repo_root, sequence_dir)
-    faa_path = resolved_dir / f"{busco_id}.faa"
-    gff_path = resolved_dir / f"{busco_id}.gff"
-    if not faa_path.is_file() or not gff_path.is_file():
+    if is_concatenated_artifact(recorded_path):
+        faa_path = recorded_path
+        gff_path = artifact_paths.get(GFF_ARTIFACT_BY_CATEGORY[category], "")
+        if not gff_path:
+            raise BuscoValidationError(
+                f"BUSCO artifact index does not provide {GFF_ARTIFACT_BY_CATEGORY[category]!r} "
+                f"for status {status!r}."
+            )
+        sequence_dir = Path(recorded_path).parent.as_posix()
+    else:
+        sequence_dir = recorded_path
+        faa_path = (Path(recorded_path) / f"{busco_id}.faa").as_posix()
+        gff_path = (Path(recorded_path) / f"{busco_id}.gff").as_posix()
+
+    if not has_fasta_records_for_id(faa_path, busco_id, repo_root) or not has_gff_block(
+        gff_path, busco_id, repo_root
+    ):
         raise BuscoValidationError(
-            f"Expected BUSCO sequence files for {busco_id!r} under {sequence_dir!r}."
+            f"Expected BUSCO sequence records for {busco_id!r} in {faa_path!r} and {gff_path!r}."
         )
 
     return {
         "sequence_category": artifact_name,
         "sequence_dir": sequence_dir,
-        "faa_path": (Path(sequence_dir) / f"{busco_id}.faa").as_posix(),
-        "gff_path": (Path(sequence_dir) / f"{busco_id}.gff").as_posix(),
+        "faa_path": faa_path,
+        "gff_path": gff_path,
     }
 
 
@@ -365,17 +398,33 @@ def hydrate_stable_busco_sequence_paths(
     stable_paths: dict[str, str],
     repo_root: Path,
 ) -> dict[str, str]:
+    """Prefer the copies under `results/busco/` over the scratch paths BUSCO reported."""
     hydrated = dict(artifact_paths)
-    stable_artifacts = {
-        "single_copy_busco_sequences": stable_paths["single_copy_sequence_dir"],
-        "multi_copy_busco_sequences": stable_paths["multi_copy_sequence_dir"],
-        "fragmented_busco_sequences": stable_paths["fragmented_sequence_dir"],
-    }
-    for artifact_name, stable_dir in stable_artifacts.items():
-        stable_path = _resolve_repo_path(repo_root, stable_dir)
-        if stable_path.is_dir():
-            hydrated[artifact_name] = stable_dir
+    for category in LEGACY_DIR_BY_CATEGORY:
+        faa_artifact = FAA_ARTIFACT_BY_CATEGORY[category]
+        gff_artifact = GFF_ARTIFACT_BY_CATEGORY[category]
+        stable_faa = stable_paths[f"{category}_faa"]
+        stable_per_locus_dir = stable_paths[f"{category}_per_locus_dir"]
+
+        if _resolve_repo_path(repo_root, stable_faa).is_file():
+            hydrated[faa_artifact] = stable_faa
+            hydrated[gff_artifact] = stable_paths[f"{category}_gff"]
+        elif _resolve_repo_path(repo_root, stable_per_locus_dir).is_dir():
+            hydrated[faa_artifact] = stable_per_locus_dir
+            hydrated.pop(gff_artifact, None)
     return hydrated
+
+
+def _sequence_path_columns(artifact_paths: dict[str, str]) -> dict[str, str]:
+    columns: dict[str, str] = {}
+    layouts = set()
+    for category in LEGACY_DIR_BY_CATEGORY:
+        recorded_path = artifact_paths.get(FAA_ARTIFACT_BY_CATEGORY[category], "")
+        columns[f"{category}_sequence_path"] = recorded_path
+        if recorded_path:
+            layouts.add(artifact_layout(recorded_path))
+    columns["sequence_layout"] = "/".join(sorted(layouts))
+    return columns
 
 
 def build_busco_tables(validated_manifest_path: Path, repo_root: Path) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
@@ -417,9 +466,7 @@ def build_busco_tables(validated_manifest_path: Path, repo_root: Path) -> tuple[
                 "short_summary_path": stable_paths["short_summary"],
                 "full_table_path": stable_paths["full_table"],
                 "run_complete_path": stable_paths["completion"],
-                "single_copy_sequence_dir": artifact_paths.get("single_copy_busco_sequences", ""),
-                "multi_copy_sequence_dir": artifact_paths.get("multi_copy_busco_sequences", ""),
-                "fragmented_sequence_dir": artifact_paths.get("fragmented_busco_sequences", ""),
+                **_sequence_path_columns(artifact_paths),
             }
         )
 
@@ -447,18 +494,20 @@ def _find_optional_dir(base_dir: Path, name: str) -> str:
     return matches[0].as_posix() if matches else ""
 
 
-def _copy_optional_dir(source_root: Path, artifact_name: str, destination_root: Path) -> str:
-    source_dir_text = _find_optional_dir(source_root, artifact_name)
-    if not source_dir_text:
-        return ""
+def _concatenate_optional_category(
+    raw_root: Path,
+    sequence_root: Path,
+    category: str,
+) -> dict[str, str]:
+    """Fold one BUSCO output directory into `<category>.faa` / `<category>.gff`.
 
-    source_dir = Path(source_dir_text)
-    destination_dir = destination_root / artifact_name
-    if destination_dir.exists():
-        shutil.rmtree(destination_dir)
-    destination_dir.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source_dir, destination_dir)
-    return destination_dir.as_posix()
+    BUSCO emits two files per locus, which is two inodes per locus per sample;
+    the workflow keeps the same records addressed by BUSCO id instead.
+    """
+    source_dir_text = _find_optional_dir(raw_root, LEGACY_DIR_BY_CATEGORY[category])
+    if not source_dir_text:
+        return {"faa_path": "", "gff_path": ""}
+    return concatenate_busco_category(Path(source_dir_text), sequence_root, category)
 
 
 def standardize_busco_run(sample_id: str, sample_dir: Path, raw_root: Path) -> None:
@@ -479,31 +528,22 @@ def standardize_busco_run(sample_id: str, sample_dir: Path, raw_root: Path) -> N
         shutil.rmtree(sequence_root)
     sequence_root.mkdir(parents=True, exist_ok=True)
 
-    single_copy_target = _copy_optional_dir(raw_root, "single_copy_busco_sequences", sequence_root)
-    multi_copy_target = _copy_optional_dir(raw_root, "multi_copy_busco_sequences", sequence_root)
-    fragmented_target = _copy_optional_dir(raw_root, "fragmented_busco_sequences", sequence_root)
+    path_rows = [
+        {"artifact": "raw_root", "path": raw_root.as_posix()},
+        {"artifact": "short_summary_source", "path": short_summary_source.as_posix()},
+        {"artifact": "full_table_source", "path": full_table_source.as_posix()},
+        {"artifact": "sequence_layout", "path": CONCATENATED_LAYOUT},
+    ]
+    for category in LEGACY_DIR_BY_CATEGORY:
+        written = _concatenate_optional_category(raw_root, sequence_root, category)
+        path_rows.append(
+            {"artifact": FAA_ARTIFACT_BY_CATEGORY[category], "path": written["faa_path"]}
+        )
+        path_rows.append(
+            {"artifact": GFF_ARTIFACT_BY_CATEGORY[category], "path": written["gff_path"]}
+        )
 
-    write_tsv(
-        paths_target,
-        [
-            {"artifact": "raw_root", "path": raw_root.as_posix()},
-            {"artifact": "short_summary_source", "path": short_summary_source.as_posix()},
-            {"artifact": "full_table_source", "path": full_table_source.as_posix()},
-            {
-                "artifact": "single_copy_busco_sequences",
-                "path": single_copy_target,
-            },
-            {
-                "artifact": "multi_copy_busco_sequences",
-                "path": multi_copy_target,
-            },
-            {
-                "artifact": "fragmented_busco_sequences",
-                "path": fragmented_target,
-            },
-        ],
-        ["artifact", "path"],
-    )
+    write_tsv(paths_target, path_rows, ["artifact", "path"])
     completion_target.write_text(
         f"sample_id\t{sample_id}\nraw_root\t{raw_root.as_posix()}\n",
         encoding="utf-8",

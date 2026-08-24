@@ -14,10 +14,13 @@ RETENTION_PATTERNS: dict[str, tuple[str, ...]] = {
     "resume_alignments": (
         "work/busco/*/raw",
         "results/busco/*/raw",
+        # One file per locus per sample, from a run before the per-sample layout.
+        "results/dna_sequences/*/per_locus",
     ),
     "resume_gene_trees": (
         "work/busco/*/raw",
         "results/busco/*/raw",
+        "results/dna_sequences/*/per_locus",
         "results/loci/raw_fastas",
         "results/loci/raw_fastas.complete",
         "results/loci/logs",
@@ -26,6 +29,7 @@ RETENTION_PATTERNS: dict[str, tuple[str, ...]] = {
     "final_report": (
         "work/busco/*/raw",
         "results/busco/*/raw",
+        "results/dna_sequences/*/per_locus",
         "results/loci/raw_fastas",
         "results/loci/raw_fastas.complete",
         "results/loci/logs",

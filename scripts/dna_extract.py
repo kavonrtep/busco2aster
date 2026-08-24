@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import csv
 import shlex
+import shutil
 import subprocess
 from pathlib import Path
 
+from .busco_sequences import read_gff_text
 from .locus_matrix import parse_fasta_records
 from .manifest import write_tsv
 
@@ -17,7 +19,7 @@ DNA_RECORD_FIELDNAMES = [
     "sanitized_taxon_id",
     "transcript_id",
     "source_gff_path",
-    "per_locus_fasta",
+    "extracted_fasta",
     "sequence_length_nt",
 ]
 
@@ -38,14 +40,15 @@ def sample_dna_output_paths(sample_id: str) -> dict[str, str]:
         "records": (root / "retained_loci.records.tsv").as_posix(),
         "command": (root / "gffread.command.sh").as_posix(),
         "log": (root / "gffread.log").as_posix(),
-        "per_locus_dir": (root / "per_locus").as_posix(),
         "completion": (root / "run.complete").as_posix(),
+        # Written by releases before the per-sample layout; removed on re-run.
+        "legacy_per_locus_dir": (root / "per_locus").as_posix(),
     }
 
 
-def per_locus_dna_sequence_path(sample_id: str, locus_id: str) -> str:
-    root = Path(sample_dna_output_paths(sample_id)["per_locus_dir"])
-    return (root / f"{locus_id}.fna").as_posix()
+def sample_dna_fasta_path(sample_id: str) -> str:
+    """Every locus of one sample lives in this single gffread output."""
+    return sample_dna_output_paths(sample_id)["extracted_fasta"]
 
 
 def _resolve_repo_path(repo_root: Path, path_text: str) -> Path:
@@ -107,18 +110,19 @@ def _select_sample_rows(
 def _rewrite_locus_gff(
     *,
     locus_id: str,
-    source_path: Path,
+    source_text: str,
+    source_label: str,
     destination_handle,
     transcript_id: str,
 ) -> None:
     transcript_seen = False
-    for raw_line in source_path.read_text(encoding="utf-8").splitlines():
+    for raw_line in source_text.splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
         columns = line.split("\t")
         if len(columns) != 9:
-            raise ValueError(f"GFF record in {source_path} does not have 9 columns: {raw_line!r}")
+            raise ValueError(f"GFF record in {source_label} does not have 9 columns: {raw_line!r}")
         feature_type = columns[2]
         attributes = _parse_gff_attributes(columns[8])
 
@@ -135,15 +139,10 @@ def _rewrite_locus_gff(
         destination_handle.write("\t".join(columns) + "\n")
 
     if not transcript_seen:
-        raise ValueError(f"BUSCO GFF for locus {locus_id!r} does not contain an mRNA/transcript feature: {source_path}")
-
-
-def _write_split_fasta(output_path: Path, header: str, sequence: str) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as handle:
-        handle.write(f">{header}\n")
-        for start in range(0, len(sequence), 80):
-            handle.write(sequence[start : start + 80] + "\n")
+        raise ValueError(
+            f"BUSCO GFF for locus {locus_id!r} does not contain an mRNA/transcript feature: "
+            f"{source_label}"
+        )
 
 
 def build_gffread_command(
@@ -183,7 +182,7 @@ def extract_retained_sample_dna(
     aggregated_gff_path = Path(output_paths["aggregated_gff"])
     extracted_fasta_path = Path(output_paths["extracted_fasta"])
     records_path = Path(output_paths["records"])
-    per_locus_dir = Path(output_paths["per_locus_dir"])
+    legacy_per_locus_dir = Path(output_paths["legacy_per_locus_dir"])
     command_path = Path(output_paths["command"])
     log_path = Path(output_paths["log"])
     completion_path = Path(output_paths["completion"])
@@ -197,7 +196,9 @@ def extract_retained_sample_dna(
         raise ValueError(f"No retained complete single-copy loci were found for sample {sample_id!r}.")
 
     aggregated_gff_path.parent.mkdir(parents=True, exist_ok=True)
-    per_locus_dir.mkdir(parents=True, exist_ok=True)
+    if legacy_per_locus_dir.is_dir():
+        # One file per locus per sample, from a release before this layout.
+        shutil.rmtree(legacy_per_locus_dir)
     with aggregated_gff_path.open("w", encoding="utf-8") as handle:
         handle.write("##gff-version 3\n")
         for row in selected_rows:
@@ -205,12 +206,10 @@ def extract_retained_sample_dna(
             gff_path_text = row.get("gff_path", "").strip()
             if not gff_path_text:
                 raise ValueError(f"Matrix row for sample {sample_id!r} locus {locus_id!r} is missing gff_path.")
-            source_gff_path = _resolve_repo_path(repo_root, gff_path_text)
-            if not source_gff_path.is_file():
-                raise ValueError(f"BUSCO GFF does not exist for sample {sample_id!r} locus {locus_id!r}: {source_gff_path}")
             _rewrite_locus_gff(
                 locus_id=locus_id,
-                source_path=source_gff_path,
+                source_text=read_gff_text(gff_path_text, locus_id, repo_root),
+                source_label=f"{gff_path_text} (locus {locus_id})",
                 destination_handle=handle,
                 transcript_id=locus_id,
             )
@@ -230,7 +229,6 @@ def extract_retained_sample_dna(
         for header, sequence in parse_fasta_records(extracted_fasta_path)
     }
 
-    expected_files = set()
     record_rows: list[dict[str, str]] = []
     for row in selected_rows:
         locus_id = row["locus_id"]
@@ -239,9 +237,6 @@ def extract_retained_sample_dna(
             raise ValueError(
                 f"gffread output for sample {sample_id!r} does not contain expected transcript {locus_id!r}."
             )
-        output_fasta_path = Path(per_locus_dna_sequence_path(sample_id, locus_id))
-        _write_split_fasta(output_fasta_path, row["sanitized_taxon_id"], sequence)
-        expected_files.add(output_fasta_path.name)
         record_rows.append(
             {
                 "sample_id": sample_id,
@@ -249,14 +244,10 @@ def extract_retained_sample_dna(
                 "sanitized_taxon_id": row["sanitized_taxon_id"],
                 "transcript_id": locus_id,
                 "source_gff_path": row["gff_path"],
-                "per_locus_fasta": output_fasta_path.as_posix(),
+                "extracted_fasta": extracted_fasta_path.as_posix(),
                 "sequence_length_nt": str(len(sequence)),
             }
         )
-
-    for path in per_locus_dir.glob("*.fna"):
-        if path.name not in expected_files:
-            path.unlink()
 
     write_tsv(records_path, record_rows, DNA_RECORD_FIELDNAMES)
     completion_path.write_text(f"sample_id\t{sample_id}\nrecords\t{len(record_rows)}\n", encoding="utf-8")

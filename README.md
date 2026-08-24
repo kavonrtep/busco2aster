@@ -71,7 +71,7 @@ Current optimization-related behavior:
 
 - assembly FASTA files are rewritten with `seqkit` into wrapped cached `.fa.gz` files before BUSCO
 - BUSCO raw scratch is written under `work/busco/`
-- stable BUSCO sequence files are copied into `results/busco/*/busco_sequences/`
+- stable BUSCO sequences are concatenated per sample into `results/busco/*/busco_sequences/<category>.{faa,gff}`
 - alignments run in batches to reduce scheduler overhead
 - gene trees use one IQ-TREE directory-mode run instead of one workflow job per locus
 
@@ -206,7 +206,8 @@ Key outputs are:
 - `results/qc/locus_taxon_matrix.tsv`
 - `results/qc/retained_loci.tsv`
 - `results/loci/alignments/`
-- `results/busco/*/busco_sequences/`
+- `results/busco/*/busco_sequences/single_copy.{faa,gff}`
+- `results/dna_sequences/*/retained_loci.fna` (DNA mode)
 - `results/gene_trees/gene_tree_manifest.tsv`
 - `results/gene_trees/gene_trees.raw.tre`
 - `results/species_tree/species_tree.wastral.tre`
@@ -221,6 +222,35 @@ Key outputs are:
 - [results/report/report.html](/home/petr/PycharmProjects/get_phylo/results/report/report.html)
 
 The final species tree is unrooted. The Markdown report is the compact audit summary. The HTML report adds dataset overview plots, a pipeline diagram, a labeled species tree, branch-level concordance panels, conflict summaries, gene-tree heterogeneity plots, and a topological uncertainty section (quartet posteriors + AU test results).
+
+## Sequence Storage Layout
+
+BUSCO writes one `.faa` and one `.gff` per locus per category, which is two
+inodes per locus per sample: a 23-genome run over 7,605 loci leaves 360,088
+files averaging under a kilobyte. On shared HPC storage the binding quota is
+usually the file count rather than the byte count, so the workflow concatenates
+each category into one pair of files per sample:
+
+```
+results/busco/<sample>/busco_sequences/single_copy.faa   # >{busco_id} {original header}
+results/busco/<sample>/busco_sequences/single_copy.gff   # blocks behind ##busco_id <id>
+```
+
+DNA mode stores each sample's CDS in `results/dna_sequences/<sample>/retained_loci.fna`
+and no longer writes a `per_locus/` directory beside it. Per-locus files remain
+only under `results/loci/{raw_fastas,alignments}`, where each file is an
+independent MAFFT/IQ-TREE input.
+
+Notes:
+
+- **Existing runs keep working.** `paths.tsv` records which layout a sample uses,
+  and every reader accepts both, so a `results/busco/` tree from an earlier
+  release is read in place — no BUSCO re-run needed.
+- Records stay addressable by BUSCO id; a duplicated locus keeps all of its
+  records, and each GFF block is preserved verbatim.
+- `python3 -m scripts.cleanup_outputs` removes leftover
+  `results/dna_sequences/*/per_locus` directories from earlier runs; the DNA
+  extraction rule also deletes its own when it re-runs.
 
 ## Topology Testing
 

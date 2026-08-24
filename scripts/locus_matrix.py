@@ -8,6 +8,7 @@ from pathlib import Path
 from statistics import median
 from typing import Iterable
 
+from .busco_sequences import parse_fasta_records_text, read_fasta_records_for_id
 from .manifest import write_tsv
 
 
@@ -99,11 +100,6 @@ def load_busco_record_rows(path: Path) -> list[dict[str, str]]:
     return rows
 
 
-def _resolve_repo_path(repo_root: Path, path_text: str) -> Path:
-    path = Path(path_text)
-    return path if path.is_absolute() else repo_root / path
-
-
 def _bool_text(value: bool) -> str:
     return "true" if value else "false"
 
@@ -140,28 +136,10 @@ def _busco_sort_key(busco_id: str) -> tuple[int, str]:
 
 
 def parse_fasta_records(path: Path) -> list[tuple[str, str]]:
-    records: list[tuple[str, str]] = []
-    header = ""
-    sequence_lines: list[str] = []
-
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        if line.startswith(">"):
-            if header:
-                records.append((header, "".join(sequence_lines)))
-            header = line[1:]
-            sequence_lines = []
-            continue
-        sequence_lines.append(line)
-
-    if header:
-        records.append((header, "".join(sequence_lines)))
-    return records
+    return parse_fasta_records_text(path.read_text(encoding="utf-8"))
 
 
-def analyze_protein_sequences(faa_path: str, repo_root: Path) -> dict[str, object]:
+def analyze_protein_sequences(faa_path: str, busco_id: str, repo_root: Path) -> dict[str, object]:
     if not faa_path:
         return {
             "sequence_count": 0,
@@ -174,13 +152,11 @@ def analyze_protein_sequences(faa_path: str, repo_root: Path) -> dict[str, objec
             "invalid_amino_acids": "",
         }
 
-    resolved_path = _resolve_repo_path(repo_root, faa_path)
-    if not resolved_path.is_file():
-        raise ValueError(f"Expected FASTA file does not exist: {resolved_path}")
-
-    records = parse_fasta_records(resolved_path)
+    records = read_fasta_records_for_id(faa_path, busco_id, repo_root)
     if not records:
-        raise ValueError(f"Expected at least one FASTA record in {resolved_path}")
+        raise ValueError(
+            f"Expected at least one FASTA record for locus {busco_id!r} in {faa_path}"
+        )
 
     lengths: list[int] = []
     invalid_chars: set[str] = set()
@@ -282,7 +258,7 @@ def summarize_locus_sample_cell(
 
     faa_path = faa_paths[0] if faa_paths else ""
     gff_path = gff_paths[0] if gff_paths else ""
-    protein_stats = analyze_protein_sequences(faa_path, repo_root) if faa_path else analyze_protein_sequences("", repo_root)
+    protein_stats = analyze_protein_sequences(faa_path, locus_id, repo_root)
 
     record_count = len(record_rows)
     sequence_count = int(protein_stats["sequence_count"])

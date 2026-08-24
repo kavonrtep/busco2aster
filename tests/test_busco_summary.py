@@ -75,7 +75,30 @@ busco_d\tMissing
 """
 
 
-def write_fixture_busco_run(repo_root: Path, sample_id: str, taxon_id: str) -> None:
+LOCUS_BY_CATEGORY = {
+    "single_copy": "busco_a",
+    "multi_copy": "busco_b",
+    "fragmented": "busco_c",
+}
+
+
+def fixture_locus_sequences(busco_id: str) -> tuple[str, str]:
+    faa = f">{busco_id}\nMA*\n"
+    gff = f"##gff-version 3\nchr1\tbusco\tmRNA\t10\t90\t.\t+\t.\tID={busco_id}\n"
+    return faa, gff
+
+
+def write_fixture_busco_run(
+    repo_root: Path,
+    sample_id: str,
+    taxon_id: str,
+    layout: str = "concatenated",
+) -> None:
+    """Write one sample's BUSCO outputs in either sequence layout.
+
+    `per_locus` is what releases before the concatenated layout produced, and is
+    still read so that existing `results/busco/` trees keep working.
+    """
     stable_paths = busco_output_paths(sample_id)
     sample_root = repo_root / stable_paths["sample_root"]
     raw_root = repo_root / stable_paths["raw_root"]
@@ -83,13 +106,9 @@ def write_fixture_busco_run(repo_root: Path, sample_id: str, taxon_id: str) -> N
     full_table_path = repo_root / stable_paths["full_table"]
     paths_tsv_path = repo_root / stable_paths["paths"]
     completion_path = repo_root / stable_paths["completion"]
-
     sequence_root = repo_root / stable_paths["sequence_root"]
-    single_copy_dir = sequence_root / "single_copy_busco_sequences"
-    multi_copy_dir = sequence_root / "multi_copy_busco_sequences"
-    fragmented_dir = sequence_root / "fragmented_busco_sequences"
 
-    for directory in (sample_root, raw_root, single_copy_dir, multi_copy_dir, fragmented_dir):
+    for directory in (sample_root, raw_root, sequence_root):
         directory.mkdir(parents=True, exist_ok=True)
 
     short_summary_path.write_text(
@@ -105,35 +124,43 @@ def write_fixture_busco_run(repo_root: Path, sample_id: str, taxon_id: str) -> N
     full_table_path.write_text(FULL_TABLE_FIXTURE, encoding="utf-8")
     completion_path.write_text(f"sample_id\t{sample_id}\n", encoding="utf-8")
 
-    for directory, busco_id in (
-        (single_copy_dir, "busco_a"),
-        (multi_copy_dir, "busco_b"),
-        (fragmented_dir, "busco_c"),
-    ):
-        (directory / f"{busco_id}.faa").write_text(f">{busco_id}\nMA*\n", encoding="utf-8")
-        (directory / f"{busco_id}.gff").write_text("##gff-version 3\n", encoding="utf-8")
+    path_rows = [
+        {"artifact": "raw_root", "path": stable_paths["raw_root"]},
+        {"artifact": "short_summary_source", "path": stable_paths["short_summary"]},
+        {"artifact": "full_table_source", "path": stable_paths["full_table"]},
+        {"artifact": "sequence_layout", "path": layout},
+    ]
 
-    write_tsv(
-        paths_tsv_path,
-        [
-            {"artifact": "raw_root", "path": stable_paths["raw_root"]},
-            {"artifact": "short_summary_source", "path": stable_paths["short_summary"]},
-            {"artifact": "full_table_source", "path": stable_paths["full_table"]},
+    for category, busco_id in LOCUS_BY_CATEGORY.items():
+        faa_text, gff_text = fixture_locus_sequences(busco_id)
+        if layout == "concatenated":
+            (repo_root / stable_paths[f"{category}_faa"]).write_text(faa_text, encoding="utf-8")
+            (repo_root / stable_paths[f"{category}_gff"]).write_text(
+                f"##busco_id {busco_id}\n{gff_text}", encoding="utf-8"
+            )
+            path_rows.append(
+                {
+                    "artifact": f"{category}_busco_sequences",
+                    "path": stable_paths[f"{category}_faa"],
+                }
+            )
+            path_rows.append(
+                {"artifact": f"{category}_busco_gff", "path": stable_paths[f"{category}_gff"]}
+            )
+            continue
+
+        per_locus_dir = repo_root / stable_paths[f"{category}_per_locus_dir"]
+        per_locus_dir.mkdir(parents=True, exist_ok=True)
+        (per_locus_dir / f"{busco_id}.faa").write_text(faa_text, encoding="utf-8")
+        (per_locus_dir / f"{busco_id}.gff").write_text(gff_text, encoding="utf-8")
+        path_rows.append(
             {
-                "artifact": "single_copy_busco_sequences",
-                "path": stable_paths["single_copy_sequence_dir"],
-            },
-            {
-                "artifact": "multi_copy_busco_sequences",
-                "path": stable_paths["multi_copy_sequence_dir"],
-            },
-            {
-                "artifact": "fragmented_busco_sequences",
-                "path": stable_paths["fragmented_sequence_dir"],
-            },
-        ],
-        ["artifact", "path"],
-    )
+                "artifact": f"{category}_busco_sequences",
+                "path": stable_paths[f"{category}_per_locus_dir"],
+            }
+        )
+
+    write_tsv(paths_tsv_path, path_rows, ["artifact", "path"])
 
 
 class BuscoSummaryParserTests(unittest.TestCase):
@@ -185,7 +212,7 @@ class BuscoSummaryParserTests(unittest.TestCase):
 
 
 class BuscoSummaryIntegrationTests(unittest.TestCase):
-    def test_summary_cli_writes_one_row_per_sample(self):
+    def _run_summary_cli(self, layout: str) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir)
             manifest_path = repo_root / "validated_manifest.tsv"
@@ -210,8 +237,8 @@ class BuscoSummaryIntegrationTests(unittest.TestCase):
                 ],
                 ["sample_id", "taxon_id", "sanitized_taxon_id", "assembly_fasta"],
             )
-            write_fixture_busco_run(repo_root, "sample_one", "sample_one")
-            write_fixture_busco_run(repo_root, "sample_two", "sample_two")
+            write_fixture_busco_run(repo_root, "sample_one", "sample_one", layout=layout)
+            write_fixture_busco_run(repo_root, "sample_two", "sample_two", layout=layout)
 
             subprocess.run(
                 [
@@ -237,12 +264,35 @@ class BuscoSummaryIntegrationTests(unittest.TestCase):
                 summary_rows = list(csv.DictReader(handle, delimiter="\t"))
             with records_output.open(newline="", encoding="utf-8") as handle:
                 record_rows = list(csv.DictReader(handle, delimiter="\t"))
+        return summary_rows, record_rows
+
+    def test_summary_cli_writes_one_row_per_sample(self):
+        summary_rows, record_rows = self._run_summary_cli("concatenated")
 
         self.assertEqual(len(summary_rows), 2)
         self.assertEqual(summary_rows[0]["sample_id"], "sample_one")
         self.assertEqual(summary_rows[1]["sample_id"], "sample_two")
         self.assertEqual(summary_rows[0]["full_table_consistent"], "true")
         self.assertEqual(len(record_rows), 10)
+        self.assertEqual(summary_rows[0]["sequence_layout"], "concatenated")
+        self.assertTrue(
+            summary_rows[0]["single_copy_sequence_path"].endswith("busco_sequences/single_copy.faa")
+        )
+
+    def test_summary_cli_still_reads_per_locus_runs(self):
+        """An existing results/busco/ tree keeps working without re-running BUSCO."""
+        legacy_summary, legacy_records = self._run_summary_cli("per_locus")
+        current_summary, current_records = self._run_summary_cli("concatenated")
+
+        self.assertEqual(legacy_summary[0]["sequence_layout"], "per_locus")
+        self.assertEqual(len(legacy_records), len(current_records))
+        self.assertEqual(
+            [(row["busco_id"], row["status"], row["sequence_category"]) for row in legacy_records],
+            [(row["busco_id"], row["status"], row["sequence_category"]) for row in current_records],
+        )
+        self.assertTrue(
+            legacy_records[0]["faa_path"].endswith("single_copy_busco_sequences/busco_a.faa")
+        )
 
 
 class BuscoSummaryWorkflowTests(unittest.TestCase):

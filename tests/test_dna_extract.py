@@ -6,13 +6,13 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from scripts.busco_sequences import read_fasta_records_for_id
 from scripts.dna_extract import (
     build_gffread_command,
     extract_retained_sample_dna,
-    per_locus_dna_sequence_path,
+    sample_dna_fasta_path,
     sample_dna_output_paths,
 )
-from scripts.locus_matrix import parse_fasta_records
 from scripts.manifest import write_tsv
 from scripts.sequence_mode import resolve_scfl_model
 
@@ -45,7 +45,7 @@ class DnaExtractUnitTests(unittest.TestCase):
         self.assertIn("work/assemblies_prepared/sample.fa", command)
         self.assertIn("results/dna_sequences/sample/retained_loci.fna", command)
 
-    def test_extract_retained_sample_dna_writes_per_locus_fastas(self):
+    def test_extract_retained_sample_dna_writes_one_fasta_per_sample(self):
         with TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir)
             matrix_path = repo_root / "matrix.tsv"
@@ -279,6 +279,10 @@ class DnaExtractUnitTests(unittest.TestCase):
                 ["locus_id", "decision"],
             )
 
+            legacy_per_locus_dir = repo_root / sample_dna_output_paths("sample1")["legacy_per_locus_dir"]
+            legacy_per_locus_dir.mkdir(parents=True)
+            (legacy_per_locus_dir / "locus_plus.fna").write_text(">stale\nAAA\n", encoding="utf-8")
+
             cwd = Path.cwd()
             try:
                 os.chdir(repo_root)
@@ -294,14 +298,35 @@ class DnaExtractUnitTests(unittest.TestCase):
                 os.chdir(cwd)
 
             self.assertEqual([row["locus_id"] for row in rows], ["locus_minus", "locus_plus"])
-            plus_records = parse_fasta_records(repo_root / per_locus_dna_sequence_path("sample1", "locus_plus"))
-            minus_records = parse_fasta_records(repo_root / per_locus_dna_sequence_path("sample1", "locus_minus"))
-            self.assertEqual(plus_records, [("taxon_one", "ATGGCCGAA")])
-            self.assertEqual(minus_records, [("taxon_one", "ATGAAATGA")])
+
+            sample_fasta = sample_dna_fasta_path("sample1")
+            plus_records = read_fasta_records_for_id(sample_fasta, "locus_plus", repo_root)
+            minus_records = read_fasta_records_for_id(sample_fasta, "locus_minus", repo_root)
+            self.assertEqual([sequence for _, sequence in plus_records], ["ATGGCCGAA"])
+            self.assertEqual([sequence for _, sequence in minus_records], ["ATGAAATGA"])
+
+            # Both loci live in one file, and the fragments from older runs are gone.
+            self.assertFalse(legacy_per_locus_dir.exists())
+            self.assertEqual(
+                sorted(path.name for path in (repo_root / "results/dna_sequences/sample1").iterdir()),
+                [
+                    "gffread.command.sh",
+                    "gffread.log",
+                    "retained_loci.fna",
+                    "retained_loci.gff3",
+                    "retained_loci.records.tsv",
+                    "run.complete",
+                ],
+            )
+
             records_path = repo_root / sample_dna_output_paths("sample1")["records"]
             with records_path.open(newline="", encoding="utf-8") as handle:
                 record_rows = list(csv.DictReader(handle, delimiter="\t"))
             self.assertEqual(len(record_rows), 2)
+            self.assertEqual(
+                {row["extracted_fasta"] for row in record_rows},
+                {"results/dna_sequences/sample1/retained_loci.fna"},
+            )
 
 
 class DnaModeWorkflowTests(unittest.TestCase):

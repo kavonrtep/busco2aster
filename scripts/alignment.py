@@ -6,8 +6,8 @@ import csv
 import subprocess
 from pathlib import Path
 
-from .dna_extract import per_locus_dna_sequence_path
-from .locus_matrix import parse_fasta_records
+from .busco_sequences import read_fasta_records_for_id
+from .dna_extract import sample_dna_fasta_path
 from .manifest import write_tsv
 from .sequence_mode import (
     alignment_path as build_alignment_path,
@@ -39,11 +39,6 @@ def locus_output_paths(locus_id: str, sequence_type: str = "protein") -> dict[st
 def alignment_batch_output_paths(batch_id: str) -> dict[str, str]:
     completion = Path("results") / "loci" / "batches" / f"alignment_batch_{batch_id}.complete"
     return {"completion": completion.as_posix()}
-
-
-def _resolve_repo_path(repo_root: Path, path_text: str) -> Path:
-    path = Path(path_text)
-    return path if path.is_absolute() else repo_root / path
 
 
 def _load_tsv_rows(path: Path) -> list[dict[str, str]]:
@@ -113,13 +108,14 @@ def _build_matrix_index(
     return index
 
 
-def _read_single_sequence(sequence_path: str, repo_root: Path) -> str:
-    resolved_path = _resolve_repo_path(repo_root, sequence_path)
-    if not resolved_path.is_file():
-        raise ValueError(f"Expected locus sequence FASTA does not exist: {resolved_path}")
-    records = parse_fasta_records(resolved_path)
+def _read_single_sequence(sequence_path: str, locus_id: str, repo_root: Path) -> str:
+    """Read one locus out of a per-sample multi-FASTA (or a per-locus file, for older runs)."""
+    records = read_fasta_records_for_id(sequence_path, locus_id, repo_root)
     if len(records) != 1:
-        raise ValueError(f"Expected exactly one FASTA record in {resolved_path}, found {len(records)}.")
+        raise ValueError(
+            f"Expected exactly one FASTA record for locus {locus_id!r} in {sequence_path}, "
+            f"found {len(records)}."
+        )
     _, sequence = records[0]
     return sequence.strip().upper()
 
@@ -147,7 +143,8 @@ def _build_locus_fasta_records(
             _read_single_sequence(
                 row["faa_path"]
                 if sequence_type == "protein"
-                else per_locus_dna_sequence_path(row["sample_id"], locus_id),
+                else sample_dna_fasta_path(row["sample_id"]),
+                locus_id,
                 repo_root,
             ),
         )

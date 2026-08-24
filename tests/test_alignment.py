@@ -28,16 +28,31 @@ def write_fasta(path: Path, records: list[tuple[str, str]]) -> None:
 
 
 class AlignmentUnitTests(unittest.TestCase):
-    def build_fixture(self):
+    def build_fixture(self, layout: str = "concatenated"):
         tempdir = TemporaryDirectory()
         repo_root = Path(tempdir.name)
 
-        source_a = repo_root / "source" / "taxon_a.faa"
-        source_b = repo_root / "source" / "taxon_b.faa"
-        source_c = repo_root / "source" / "taxon_c.faa"
-        write_fasta(source_a, [("orig_a", "MKTAA*")])
-        write_fasta(source_b, [("orig_b", "MKT*AA*")])
-        write_fasta(source_c, [("orig_c", "MKTTT*")])
+        sequences = {"taxon_a": "MKTAA*", "taxon_b": "MKT*AA*", "taxon_c": "MKTTT*"}
+        sources = {}
+        for taxon, sequence in sequences.items():
+            if layout == "concatenated":
+                # One file per sample, every locus in it, records keyed by locus id.
+                path = repo_root / "busco" / taxon / "busco_sequences" / "single_copy.faa"
+                write_fasta(
+                    path,
+                    [("locus_other decoy", "MMMM*"), (f"locus_keep orig_{taxon[-1]}", sequence)],
+                )
+            else:
+                # What runs before the concatenated layout wrote: one file per locus.
+                path = repo_root / "source" / taxon / "locus_keep.faa"
+                write_fasta(path, [(f"orig_{taxon[-1]}", sequence)])
+            sources[taxon] = path
+
+        source_a, source_b, source_c = (
+            sources["taxon_a"],
+            sources["taxon_b"],
+            sources["taxon_c"],
+        )
 
         matrix_path = repo_root / "matrix.tsv"
         retained_path = repo_root / "retained.tsv"
@@ -253,6 +268,18 @@ class AlignmentUnitTests(unittest.TestCase):
             ],
         )
         return tempdir, repo_root, matrix_path, retained_path, output_path
+
+    def test_export_reads_per_locus_and_concatenated_layouts_alike(self):
+        """An existing results/busco/ tree exports the same FASTA as a new one."""
+        exported = {}
+        for layout in ("per_locus", "concatenated"):
+            tempdir, repo_root, matrix_path, retained_path, output_path = self.build_fixture(layout)
+            self.addCleanup(tempdir.cleanup)
+            export_locus_fasta("locus_keep", matrix_path, retained_path, output_path, repo_root)
+            exported[layout] = output_path.read_text(encoding="utf-8")
+
+        self.assertEqual(exported["per_locus"], exported["concatenated"])
+        self.assertIn(">taxon_a\nMKTAA*\n", exported["concatenated"])
 
     def test_export_locus_fasta_includes_only_retained_taxa(self):
         tempdir, repo_root, matrix_path, retained_path, output_path = self.build_fixture()

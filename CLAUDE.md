@@ -50,7 +50,7 @@ Rules requiring Conda environments: manifest validation, BUSCO, assembly prep, D
 
 1. **Manifest validation** (`workflow/rules/manifest.smk`) — normalize `config/samples.tsv`, verify assembly paths, produce `results/metadata/samples.validated.tsv` and `taxon_name_map.tsv`
 2. **Assembly prep** (`workflow/rules/assembly_prep.smk`) — rewrite assemblies with `seqkit` into wrapped gzipped FASTA cache under `work/assemblies_prepared/`
-3. **BUSCO** (`workflow/rules/busco.smk`) — genome-mode BUSCO with shared lineage; raw scratch in `work/busco/`, stable sequence files copied to `results/busco/*/busco_sequences/`
+3. **BUSCO** (`workflow/rules/busco.smk`) — genome-mode BUSCO with shared lineage; raw scratch in `work/busco/`, sequences concatenated per sample into `results/busco/*/busco_sequences/<category>.{faa,gff}`
 4. **BUSCO QC** (`workflow/rules/busco_summary.smk`) — parse BUSCO outputs into `results/qc/busco_summary.tsv` and `busco_records.tsv`
 5. **Locus selection** (`workflow/rules/locus_matrix.smk`) — occupancy matrix → filter loci ≥ threshold (default 0.8) → `results/qc/retained_loci.tsv`
 6. **DNA extraction** (`workflow/rules/dna_extract.smk`, optional) — extract CDS sequences via BUSCO GFF + `gffread`
@@ -71,6 +71,7 @@ Rules requiring Conda environments: manifest validation, BUSCO, assembly prep, D
 | `config/config.template.yaml` | Minimal starting template for new runs |
 | `run_pipeline.py` | Container entrypoint wrapper; validates inputs, injects tool paths, auto-scales threads |
 | `workflow/rules/` | One `.smk` file per stage; `topology_tests.smk` is the newest |
+| `scripts/busco_sequences.py` | Layout-aware reader/writer for BUSCO sequences; owns the concatenated format and the per-locus fallback |
 | `scripts/` | Python helper modules; `quartet_support.py`, `generate_alternatives.py`, `build_supermatrix.py`, `parse_au_test.py`, `topology_tests.py` are the topology-test helpers |
 | `workflow/envs/` | Conda environment specs (one per stage group) |
 | `reports/template.html.j2` | Jinja2 template for the self-contained HTML visual report |
@@ -83,6 +84,7 @@ Rules requiring Conda environments: manifest validation, BUSCO, assembly prep, D
 - **wASTRAL** (branch-support-weighted) is the default; `astral4` available for topology-only runs
 - **IQ-TREE directory mode** — one run for all loci, not one job per locus
 - **Batched alignment** — reduces Snakemake scheduler overhead
+- **One sequence file per sample per category** — BUSCO's per-locus `.faa`/`.gff` output is concatenated in `standardize_busco_run`, and DNA mode keeps only `retained_loci.fna`; per-locus files survive only under `results/loci/` where each is a separate tool input. Readers accept the older per-locus layout too, so existing `results/busco/` trees never need a re-run
 - **Explicit QC tables at every stage** — no hidden heuristics
 - **Topology tests use existing tools only** — wASTRAL (`-u 2`) and IQ-TREE 3 (AU test); no new conda environments or binaries; `run_topology_tests: false` skips the entire extension
 - **`run_pipeline.py` `SINGLE_JOB_RULES`** must include `wastral_u2_annotate` and `au_topology_test` so the container wrapper scales their thread budget to the full core allocation
