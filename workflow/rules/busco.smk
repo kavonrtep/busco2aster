@@ -51,6 +51,16 @@ rule fetch_busco_lineage:
 
 
 rule run_busco:
+    """Score one assembly against the shared lineage.
+
+    `--offline` is required, not an optimization: concurrent jobs share one
+    `--download_path`, and every online BUSCO rewrites `file_versions.tsv` there
+    in place, so a job reading it mid-rewrite aborts with "<lineage> is not a
+    valid option for 'lineages'". Offline mode resolves the dataset as
+    `<download_path>/lineages/<lineage>` and reads no version file at all;
+    `fetch_busco_lineage` has already guaranteed the dataset is present, and is
+    an input to this rule.
+    """
     input:
         assembly=ASSEMBLY_PREPARED_PATTERN,
         validated=ancient(VALIDATED_MANIFEST),
@@ -84,7 +94,7 @@ rule run_busco:
         mkdir -p {params.sample_dir:q}
         mkdir -p {resources.raw_root:q}
         printf '#!/usr/bin/env bash\nset -euo pipefail\n' > {output.command:q}
-        printf '%s\n' "busco --in {input.assembly:q} --mode genome --lineage_dataset {params.lineage:q} --cpu {threads} --out {wildcards.sample:q} --out_path {resources.raw_root:q} --download_path {params.download_path:q} -f" >> {output.command:q}
+        printf '%s\n' "busco --in {input.assembly:q} --mode genome --lineage_dataset {params.lineage:q} --cpu {threads} --out {wildcards.sample:q} --out_path {resources.raw_root:q} --download_path {params.download_path:q} --offline -f" >> {output.command:q}
         bash {output.command:q}
         python3 -m scripts.standardize_busco_run --sample-id {wildcards.sample:q} --sample-dir {params.sample_dir:q} --raw-root {resources.raw_root:q}
         """

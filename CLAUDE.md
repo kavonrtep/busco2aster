@@ -85,6 +85,7 @@ Rules requiring Conda environments: manifest validation, BUSCO, assembly prep, D
 - **IQ-TREE directory mode** — one run for all loci, not one job per locus
 - **Batched alignment** — reduces Snakemake scheduler overhead
 - **One sequence file per sample per category** — BUSCO's per-locus `.faa`/`.gff` output is concatenated in `standardize_busco_run`, and DNA mode keeps only `retained_loci.fna`; per-locus files survive only under `results/loci/` where each is a separate tool input. Readers accept the older per-locus layout too, so existing `results/busco/` trees never need a re-run
+- **`run_busco` passes `--offline`** — concurrent jobs share one `--download_path`, and an online BUSCO rewrites `file_versions.tsv` there in place, so a job reading it mid-rewrite dies with `<lineage> is not a valid option for 'lineages'`. Only `capture_busco_metadata` and `fetch_busco_lineage` may reach the network; both are single jobs that run before any scoring job
 - **Explicit QC tables at every stage** — no hidden heuristics
 - **Topology tests use existing tools only** — wASTRAL (`-u 2`) and IQ-TREE 3 (AU test); no new conda environments or binaries; `run_topology_tests: false` skips the entire extension
 - **`run_pipeline.py` `SINGLE_JOB_RULES`** must include `wastral_u2_annotate` and `au_topology_test` so the container wrapper scales their thread budget to the full core allocation

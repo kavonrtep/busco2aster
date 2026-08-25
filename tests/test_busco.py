@@ -164,6 +164,36 @@ class BuscoScratchRootTests(unittest.TestCase):
         self.assertIn("--raw-root {resources.raw_root:q}", self.rule_text)
 
 
+class BuscoOfflineLineageTests(unittest.TestCase):
+    """`run_busco` must not touch the network (GitHub issue #3).
+
+    Concurrent jobs share one `--download_path`, and an online BUSCO rewrites
+    `file_versions.tsv` there in place; a job that reads it mid-rewrite aborts
+    with "<lineage> is not a valid option for 'lineages'" even though the
+    dataset is fully downloaded.
+    """
+
+    def setUp(self):
+        self.rule_text = (REPO_ROOT / "workflow" / "rules" / "busco.smk").read_text(
+            encoding="utf-8"
+        )
+
+    def test_recorded_busco_command_runs_offline(self):
+        run_busco = _rule_block(self.rule_text, "run_busco")
+        self.assertIn("--offline", run_busco)
+        self.assertIn("--download_path {params.download_path:q} --offline", run_busco)
+
+    def test_lineage_download_rules_stay_online(self):
+        """The dataset has to be fetched by something; these two rules never run concurrently."""
+        for rule_name in ("capture_busco_metadata", "fetch_busco_lineage"):
+            self.assertNotIn("--offline", _rule_block(self.rule_text, rule_name))
+
+    def test_run_busco_waits_for_the_downloaded_dataset(self):
+        """Offline mode is only safe because the dataset is already an input."""
+        run_busco = _rule_block(self.rule_text, "run_busco")
+        self.assertIn("lineage_dataset=ancient(BUSCO_LINEAGE_DATASET_CFG)", run_busco)
+
+
 @unittest.skipUnless(shutil.which("snakemake"), "snakemake is not installed")
 class SnakemakeRerunTriggerContractTests(unittest.TestCase):
     """Guard the snakemake behaviour the scratch-root fix relies on.
@@ -252,6 +282,7 @@ class BuscoWorkflowTests(unittest.TestCase):
         )
         self.assertIn("--cpu 4", result.stdout)
         self.assertIn("--lineage_dataset solanales_odb12", result.stdout)
+        self.assertIn("--offline", result.stdout)
         self.assertIn("work/assemblies_prepared/solanum_chilense.fa.gz", result.stdout)
         self.assertIn("results/busco/solanum_chilense/run.complete", result.stdout)
         self.assertIn("results/busco/solanum_chilense/busco_sequences", result.stdout)

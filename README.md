@@ -186,10 +186,10 @@ is discarded once the artifacts have been copied into `results/busco/`, and it i
 declared as a Snakemake *resource*, not a *param*, so a new value does not
 re-trigger `run_busco`.
 
-Two things to know when resuming:
+Three things to know when resuming:
 
-- The first run after upgrading to a version that carries this fix re-runs BUSCO
-  once, because the recorded rule signature changed. To adopt an existing
+- Any release that changes the recorded `busco` command line re-runs BUSCO once,
+  because the rule signature changed with it. To adopt an existing
   `results/busco/` cache without paying for that, resubmit once with
   `--snakemake-args="--rerun-triggers mtime"`, then drop the flag.
 - Avoid `--keep-incomplete` for BUSCO runs. If a `run_busco` job dies partway
@@ -197,6 +197,14 @@ Two things to know when resuming:
   directory that later runs refuse to start from
   (`IncompleteFilesException`). Delete the affected `results/busco/<sample>/`
   directories and resubmit.
+- Scoring runs offline. `run_busco` passes `--offline`, so it needs no network
+  and never writes to the shared `busco_download_path` — concurrent jobs would
+  otherwise race on BUSCO's `file_versions.tsv` and fail with
+  `<lineage> is not a valid option for 'lineages'`. Only
+  `capture_busco_metadata` and `fetch_busco_lineage` reach the network, they run
+  once, and they run before any scoring job starts. On a cluster whose compute
+  nodes have no internet, stage the lineage from a node that does:
+  `snakemake --use-conda --cores 1 "$(pwd)/work/busco_downloads/lineages/<lineage>/dataset.cfg"`.
 
 ## Main Outputs
 
